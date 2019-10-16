@@ -16,15 +16,20 @@ import (
 var (
 	networkInterface = flag.String("network-interface", "",
 		"interface where to inject packets")
-	domains flagx.StringArray
+	domains  flagx.StringArray
+	keywords flagx.StringArray
 )
 
 func init() {
 	flag.Var(&domains, "dns-injection-for",
 		"Domain to perform DNS injection for")
+	flag.Var(&keywords, "rst-injection-for",
+		"Keywords to perform RST injection for")
 }
 
-func censordomain(handle *pcap.Handle, packet gopacket.Packet) {
+func censordomain(
+	handle *pcap.Handle, packet gopacket.Packet, dns *layers.DNS,
+) {
 	ethLayer := packet.Layer(layers.LayerTypeEthernet)
 	if ethLayer == nil {
 		log.Warn("pktinjector: not an ethernet packet")
@@ -56,12 +61,6 @@ func censordomain(handle *pcap.Handle, packet gopacket.Packet) {
 	udp.DstPort = srcPort
 	udp.SetNetworkLayerForChecksum(ip)
 
-	dnsLayer := packet.Layer(layers.LayerTypeDNS)
-	if dnsLayer == nil {
-		log.Warn("pktinjector: not a DNS packet")
-		return
-	}
-	dns := dnsLayer.(*layers.DNS)
 	dns.QR = true
 	dns.RA = true
 	dns.RD = true
@@ -69,8 +68,8 @@ func censordomain(handle *pcap.Handle, packet gopacket.Packet) {
 
 	buffer := gopacket.NewSerializeBuffer()
 	gopacket.SerializeLayers(buffer, gopacket.SerializeOptions{
-			FixLengths:       true,
-			ComputeChecksums: true,
+		FixLengths:       true,
+		ComputeChecksums: true,
 	}, eth, ip, udp, dns)
 	if err := handle.WritePacketData(buffer.Bytes()); err != nil {
 		log.WithError(err).Warn("handle.WritePacketData failed")
@@ -82,12 +81,84 @@ func processdns(
 ) {
 	if dns.QR == false {
 		for _, question := range dns.Questions {
+			name := string(question.Name)
 			for _, domain := range domains {
-				if strings.Contains(string(question.Name), domain) {
-					log.Infof("pktinjector: will DNS-censor: %s", string(question.Name))
-					censordomain(handle, packet)
+				if strings.Contains(name, domain) {
+					log.Infof("pktinjector: will DNS-censor: %s", name)
+					censordomain(handle, packet, dns)
 					return
 				}
+			}
+		}
+	}
+}
+
+func censortcp(
+	handle *pcap.Handle, packet gopacket.Packet, tcp *layers.TCP,
+) {
+	ethLayer := packet.Layer(layers.LayerTypeEthernet)
+	if ethLayer == nil {
+		log.Warn("pktinjector: not an ethernet packet")
+		return
+	}
+	eth := ethLayer.(*layers.Ethernet)
+	srcMAC := eth.SrcMAC
+	eth.SrcMAC = eth.DstMAC
+	eth.DstMAC = srcMAC
+
+	ipLayer := packet.Layer(layers.LayerTypeIPv4)
+	if ipLayer == nil {
+		log.Warn("pktinjector: not an IPv4 packet")
+		return
+	}
+	ip := ipLayer.(*layers.IPv4)
+	srcIP := ip.SrcIP
+	ip.SrcIP = ip.DstIP
+	ip.DstIP = srcIP
+
+	srcPort := tcp.SrcPort
+	tcp.SrcPort = tcp.DstPort
+	tcp.DstPort = srcPort
+	tcp.SetNetworkLayerForChecksum(ip)
+	seq := tcp.Seq
+	tcp.Seq = tcp.Ack
+	tcp.Ack = seq
+	tcp.DataOffset = 0
+	tcp.FIN = false
+	tcp.SYN = false
+	tcp.RST = true
+	tcp.PSH = false
+	tcp.ACK = false
+	tcp.URG = false
+	tcp.ECE = false
+	tcp.CWR = false
+	tcp.NS = false
+	tcp.Window = 0
+	tcp.Checksum = 0
+	tcp.Urgent = 0
+	tcp.Options = nil
+	tcp.Padding = nil
+
+	buffer := gopacket.NewSerializeBuffer()
+	gopacket.SerializeLayers(buffer, gopacket.SerializeOptions{
+		FixLengths:       true,
+		ComputeChecksums: true,
+	}, eth, ip, tcp)
+	if err := handle.WritePacketData(buffer.Bytes()); err != nil {
+		log.WithError(err).Warn("handle.WritePacketData failed")
+	}
+}
+
+func processtcp(
+	handle *pcap.Handle, packet gopacket.Packet, tcp *layers.TCP,
+) {
+	if tcp.DstPort == 80 || tcp.DstPort == 443 {
+		payload := string(tcp.LayerPayload())
+		for _, keyword := range keywords {
+			if strings.Contains(payload, keyword) {
+				log.Infof("pktinjector: will RST-censor: %s", keyword)
+				censortcp(handle, packet, tcp)
+				return
 			}
 		}
 	}
@@ -97,6 +168,10 @@ func process(handle *pcap.Handle, packet gopacket.Packet) {
 	dnslayer := packet.Layer(layers.LayerTypeDNS)
 	if dnslayer != nil {
 		processdns(handle, packet, dnslayer.(*layers.DNS))
+	}
+	tcplayer := packet.Layer(layers.LayerTypeTCP)
+	if tcplayer != nil {
+		processtcp(handle, packet, tcplayer.(*layers.TCP))
 	}
 }
 
