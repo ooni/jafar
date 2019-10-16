@@ -11,7 +11,6 @@ import (
 	"github.com/google/gopacket/pcap"
 	"github.com/m-lab/go/flagx"
 	"github.com/m-lab/go/rtx"
-	"github.com/miekg/dns"
 )
 
 var (
@@ -25,68 +24,70 @@ func init() {
 		"Domain to perform DNS injection for")
 }
 
-func reflectudp(handle *pcap.Handle, incoming gopacket.Packet, payload []byte) {
-	ethernet, ok := incoming.LinkLayer().(*layers.Ethernet)
-	if !ok {
-		log.Warn("original packet was not ethernet")
+func censordomain(handle *pcap.Handle, packet gopacket.Packet) {
+	ethLayer := packet.Layer(layers.LayerTypeEthernet)
+	if ethLayer == nil {
+		log.Warn("pktinjector: not an ethernet packet")
 		return
 	}
-	ipv4, ok := incoming.NetworkLayer().(*layers.IPv4)
-	if !ok {
-		log.Warn("original packet was not IPv4")
+	eth := ethLayer.(*layers.Ethernet)
+	srcMAC := eth.SrcMAC
+	eth.SrcMAC = eth.DstMAC
+	eth.DstMAC = srcMAC
+
+	ipLayer := packet.Layer(layers.LayerTypeIPv4)
+	if ipLayer == nil {
+		log.Warn("pktinjector: not an IPv4 packet")
 		return
 	}
-	udp, ok := incoming.TransportLayer().(*layers.UDP)
-	if !ok {
-		log.Warn("original packet was not UDP")
+	ip := ipLayer.(*layers.IPv4)
+	srcIP := ip.SrcIP
+	ip.SrcIP = ip.DstIP
+	ip.DstIP = srcIP
+
+	udpLayer := packet.Layer(layers.LayerTypeUDP)
+	if udpLayer == nil {
+		log.Warn("pktinjector: not an UDP packet")
 		return
 	}
+	udp := udpLayer.(*layers.UDP)
+	srcPort := udp.SrcPort
+	udp.SrcPort = udp.DstPort
+	udp.DstPort = srcPort
+	udp.SetNetworkLayerForChecksum(ip)
+
+	dnsLayer := packet.Layer(layers.LayerTypeDNS)
+	if dnsLayer == nil {
+		log.Warn("pktinjector: not a DNS packet")
+		return
+	}
+	dns := dnsLayer.(*layers.DNS)
+	dns.QR = true
+	dns.RA = true
+	dns.RD = true
+	dns.ResponseCode = layers.DNSResponseCodeNXDomain
+
 	buffer := gopacket.NewSerializeBuffer()
 	gopacket.SerializeLayers(buffer, gopacket.SerializeOptions{
-		FixLengths:       true,
-		ComputeChecksums: true,
-	}, &layers.Ethernet{
-		SrcMAC: ethernet.DstMAC,
-		DstMAC: ethernet.SrcMAC,
-	}, &layers.IPv4{
-		SrcIP: ipv4.DstIP,
-		DstIP: ipv4.SrcIP,
-	}, &layers.UDP{
-		SrcPort: udp.DstPort,
-		DstPort: udp.SrcPort,
-	}, gopacket.Payload(payload))
-	// TODO(bassosimone): this does not seem to work on macOS?
+			FixLengths:       true,
+			ComputeChecksums: true,
+	}, eth, ip, udp, dns)
 	if err := handle.WritePacketData(buffer.Bytes()); err != nil {
 		log.WithError(err).Warn("handle.WritePacketData failed")
 	}
 }
 
-func censordomain(handle *pcap.Handle, packet gopacket.Packet, query *dns.Msg) {
-	reply := new(dns.Msg)
-	reply.SetRcode(query, dns.RcodeNameError)
-	payload, err := reply.Pack()
-	if err != nil {
-		log.WithError(err).Warn("cannot serialize DNS payload")
-		return
-	}
-	reflectudp(handle, packet, payload)
-}
-
-func processdns(handle *pcap.Handle, packet gopacket.Packet, payload []byte) {
-	query := new(dns.Msg)
-	if err := query.Unpack(payload); err != nil {
-		log.WithError(err).Warn("cannot parse DNS payload")
-		return
-	}
-	if query.MsgHdr.Response {
-		return
-	}
-	for _, question := range query.Question {
-		for _, domain := range domains {
-			if strings.Contains(question.Name, domain) {
-				log.Infof("need to DNS censor: %s", question.Name)
-				censordomain(handle, packet, query)
-				return
+func processdns(
+	handle *pcap.Handle, packet gopacket.Packet, dns *layers.DNS,
+) {
+	if dns.QR == false {
+		for _, question := range dns.Questions {
+			for _, domain := range domains {
+				if strings.Contains(string(question.Name), domain) {
+					log.Infof("pktinjector: will DNS-censor: %s", string(question.Name))
+					censordomain(handle, packet)
+					return
+				}
 			}
 		}
 	}
@@ -95,7 +96,7 @@ func processdns(handle *pcap.Handle, packet gopacket.Packet, payload []byte) {
 func process(handle *pcap.Handle, packet gopacket.Packet) {
 	dnslayer := packet.Layer(layers.LayerTypeDNS)
 	if dnslayer != nil {
-		processdns(handle, packet, dnslayer.LayerContents())
+		processdns(handle, packet, dnslayer.(*layers.DNS))
 	}
 }
 
@@ -105,8 +106,9 @@ func Start() {
 		log.Warn("injector: no interface specified")
 		return
 	}
-	handle, err := pcap.OpenLive(*networkInterface, 1600, true, pcap.BlockForever)
+	handle, err := pcap.OpenLive(*networkInterface, 1600, false, pcap.BlockForever)
 	rtx.Must(err, "pcap.OpenLive failed")
+	defer handle.Close()
 	source := gopacket.NewPacketSource(handle, handle.LinkType())
 	for packet := range source.Packets() {
 		process(handle, packet)
