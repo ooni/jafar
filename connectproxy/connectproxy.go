@@ -18,7 +18,10 @@ import (
 var keywords flagx.StringArray
 
 func init() {
-	flag.Var(&keywords, "banned-keyword", "Add a banned keyword")
+	flag.Var(
+		&keywords, "connectproxy.reset-if-match",
+		"RST flow if <value> found at beginning of stream",
+	)
 }
 
 func hijack(w http.ResponseWriter) (net.Conn, error) {

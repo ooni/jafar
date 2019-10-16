@@ -16,14 +16,17 @@ import (
 var (
 	blocked     flagx.StringArray
 	redirected  flagx.StringArray
-	upstreamDNS = flag.String("upstream-dns", "8.8.8.8:53",
+	upstreamDNS = flag.String("dnsproxy.upstream-server", "8.8.8.8:53",
 		"Upstream DNS server to use to resolve noncensored input")
 )
 
 func init() {
-	flag.Var(&blocked, "block-domain", "Block a specific domain")
-	flag.Var(&redirected, "redirect-domain",
-		"Redirect a specific domain to 127.0.0.1")
+	flag.Var(
+		&blocked, "dnsproxy.nxdomain-if-match",
+		"Send NXDOMAIN if query name matches <value>",
+	)
+	flag.Var(&redirected, "dnsproxy.redirect-if-match",
+		"Redirect to 127.0.0.1 if query name matches <value>")
 }
 
 func roundtrip(w dns.ResponseWriter, r *dns.Msg) error {

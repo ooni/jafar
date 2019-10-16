@@ -14,17 +14,17 @@ import (
 )
 
 var (
-	networkInterface = flag.String("network-interface", "",
-		"interface where to inject packets")
+	networkInterface = flag.String("pktinjector.network-interface", "",
+		"interface where to possibly inject packets")
 	domains  flagx.StringArray
 	keywords flagx.StringArray
 )
 
 func init() {
-	flag.Var(&domains, "dns-injection-for",
-		"Domain to perform DNS injection for")
-	flag.Var(&keywords, "rst-injection-for",
-		"Keywords to perform RST injection for")
+	flag.Var(&domains, "pktinjector.nxdomain-if-match",
+		"Inject NXDOMAIN response if query name matches <value>")
+	flag.Var(&keywords, "pktinjector.reset-if-match",
+		"Inject RST segment if TCP segment matches <value>")
 }
 
 func censordomain(
