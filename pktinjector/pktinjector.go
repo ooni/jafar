@@ -33,6 +33,23 @@ func init() {
 		"Inject 127.0.0.1 response if query name matches <value>")
 }
 
+func newPcapHandleWithFilter(filter string) *pcap.Handle {
+	inactive, err := pcap.NewInactiveHandle(*networkInterface)
+	rtx.Must(err, "pcap.NewInactiveHandle failed")
+	defer inactive.CleanUp()
+	err = inactive.SetImmediateMode(true)
+	rtx.Must(err, "inactive.SetImmediateMode failed")
+	err = inactive.SetPromisc(false)
+	rtx.Must(err, "inactive.SetPromisc failed")
+	err = inactive.SetSnapLen(256)
+	rtx.Must(err, "inactive.SetSnapLen failed")
+	handle, err := inactive.Activate()
+	rtx.Must(err, "inactive.Activate failed")
+	err = handle.SetBPFFilter(filter)
+	rtx.Must(err, "handle.SetBPFFilter failed")
+	return handle
+}
+
 func censorWithNXDOMAIN(
 	handle *pcap.Handle, packet gopacket.Packet, dns *layers.DNS,
 ) {
@@ -143,11 +160,8 @@ func censorWithLocalhost(
 
 func filterDNS(wg *sync.WaitGroup) {
 	defer wg.Done()
-	handle, err := pcap.OpenLive(*networkInterface, 256, false, pcap.BlockForever)
-	rtx.Must(err, "pcap.OpenLive failed")
+	handle := newPcapHandleWithFilter("ip and udp and dst port 53")
 	defer handle.Close()
-	err = handle.SetBPFFilter("ip and udp and dst port 53")
-	rtx.Must(err, "handle.SetBPFFilter failed")
 	source := gopacket.NewPacketSource(handle, handle.LinkType())
 	for packet := range source.Packets() {
 		dnslayer := packet.Layer(layers.LayerTypeDNS)
@@ -233,11 +247,10 @@ func censorWithRST(
 
 func filterTCP(wg *sync.WaitGroup) {
 	defer wg.Done()
-	handle, err := pcap.OpenLive(*networkInterface, 256, false, pcap.BlockForever)
-	rtx.Must(err, "pcap.OpenLive failed")
+	handle := newPcapHandleWithFilter(
+		"ip and tcp and (dst port 80 or dst port 443)",
+	)
 	defer handle.Close()
-	err = handle.SetBPFFilter("ip and tcp and (dst port 80 or dst port 443)")
-	rtx.Must(err, "handle.SetBPFFilter failed")
 	source := gopacket.NewPacketSource(handle, handle.LinkType())
 	for packet := range source.Packets() {
 		tcplayer := packet.Layer(layers.LayerTypeTCP)
