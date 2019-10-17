@@ -17,24 +17,21 @@ import (
 )
 
 var (
-	networkInterface = flag.String("pktinjector.network-interface", "",
-		"interface where to possibly inject packets")
-	keywords        flagx.StringArray
-	nxdomains       flagx.StringArray
-	redirectDomains flagx.StringArray
+	interfaces flagx.StringArray
+	patterns   flagx.StringArray
 )
 
 func init() {
-	flag.Var(&keywords, "pktinjector.reset-if-match",
-		"Inject RST segment if TCP segment matches <value>")
-	flag.Var(&nxdomains, "pktinjector.nxdomain-if-match",
-		"Inject NXDOMAIN response if query name matches <value>")
-	flag.Var(&redirectDomains, "pktinjector.redirect-if-match",
-		"Inject 127.0.0.1 response if query name matches <value>")
+	flag.Var(
+		&interfaces, "interface", "Add interface where to censor",
+	)
+	flag.Var(
+		&patterns, "censor", "Add a domain to censor",
+	)
 }
 
-func newPcapHandleWithFilter(filter string) *pcap.Handle {
-	inactive, err := pcap.NewInactiveHandle(*networkInterface)
+func newPcapHandleWithFilter(ifname, filter string) *pcap.Handle {
+	inactive, err := pcap.NewInactiveHandle(ifname)
 	rtx.Must(err, "pcap.NewInactiveHandle failed")
 	defer inactive.CleanUp()
 	err = inactive.SetImmediateMode(true)
@@ -48,55 +45,6 @@ func newPcapHandleWithFilter(filter string) *pcap.Handle {
 	err = handle.SetBPFFilter(filter)
 	rtx.Must(err, "handle.SetBPFFilter failed")
 	return handle
-}
-
-func censorWithNXDOMAIN(
-	handle *pcap.Handle, packet gopacket.Packet, dns *layers.DNS,
-) {
-	ethLayer := packet.Layer(layers.LayerTypeEthernet)
-	if ethLayer == nil {
-		log.Warn("pktinjector: not an ethernet packet")
-		return
-	}
-	eth := ethLayer.(*layers.Ethernet)
-	srcMAC := eth.SrcMAC
-	eth.SrcMAC = eth.DstMAC
-	eth.DstMAC = srcMAC
-
-	ipLayer := packet.Layer(layers.LayerTypeIPv4)
-	if ipLayer == nil {
-		log.Warn("pktinjector: not an IPv4 packet")
-		return
-	}
-	ip := ipLayer.(*layers.IPv4)
-	srcIP := ip.SrcIP
-	ip.SrcIP = ip.DstIP
-	ip.DstIP = srcIP
-
-	udpLayer := packet.Layer(layers.LayerTypeUDP)
-	if udpLayer == nil {
-		log.Warn("pktinjector: not an UDP packet")
-		return
-	}
-	udp := udpLayer.(*layers.UDP)
-	srcPort := udp.SrcPort
-	udp.SrcPort = udp.DstPort
-	udp.DstPort = srcPort
-	udp.SetNetworkLayerForChecksum(ip)
-
-	dns.QR = true
-	dns.RA = true
-	dns.RD = true
-	dns.ResponseCode = layers.DNSResponseCodeNXDomain
-
-	buffer := gopacket.NewSerializeBuffer()
-	gopacket.SerializeLayers(buffer, gopacket.SerializeOptions{
-		FixLengths:       true,
-		ComputeChecksums: true,
-	}, eth, ip, udp, dns)
-	if err := handle.WritePacketData(buffer.Bytes()); err != nil {
-		log.WithError(err).Warn("handle.WritePacketData failed")
-	}
 }
 
 func censorWithLocalhost(
@@ -158,9 +106,9 @@ func censorWithLocalhost(
 	}
 }
 
-func censorDNS(wg *sync.WaitGroup) {
+func censorDNS(ifname string, wg *sync.WaitGroup) {
 	defer wg.Done()
-	handle := newPcapHandleWithFilter("ip and udp and dst port 53")
+	handle := newPcapHandleWithFilter(ifname, "ip and udp and dst port 53")
 	defer handle.Close()
 	source := gopacket.NewPacketSource(handle, handle.LinkType())
 	for packet := range source.Packets() {
@@ -171,14 +119,7 @@ func censorDNS(wg *sync.WaitGroup) {
 		dns := dnslayer.(*layers.DNS)
 		for _, question := range dns.Questions {
 			name := string(question.Name)
-			for _, domain := range nxdomains {
-				if strings.Contains(name, domain) {
-					log.Infof("pktinjector: will NXDOMAIN-inject: %s", name)
-					censorWithNXDOMAIN(handle, packet, dns)
-					break
-				}
-			}
-			for _, domain := range redirectDomains {
+			for _, domain := range patterns {
 				if strings.Contains(name, domain) {
 					log.Infof("pktinjector: will 127.0.0.1-redirect: %s", name)
 					censorWithLocalhost(handle, packet, dns)
@@ -245,9 +186,9 @@ func censorWithRST(
 	}
 }
 
-func censorTCPWithFilter(wg *sync.WaitGroup, filter string) {
+func censorTCPWithFilter(ifname string, wg *sync.WaitGroup, filter string) {
 	defer wg.Done()
-	handle := newPcapHandleWithFilter(filter)
+	handle := newPcapHandleWithFilter(ifname, filter)
 	defer handle.Close()
 	source := gopacket.NewPacketSource(handle, handle.LinkType())
 	for packet := range source.Packets() {
@@ -257,7 +198,7 @@ func censorTCPWithFilter(wg *sync.WaitGroup, filter string) {
 		}
 		tcp := tcplayer.(*layers.TCP)
 		payload := string(tcp.LayerPayload())
-		for _, keyword := range keywords {
+		for _, keyword := range patterns {
 			if strings.Contains(payload, keyword) {
 				log.Infof("pktinjector: will RST-censor: %s", keyword)
 				censorWithRST(handle, packet, tcp)
@@ -269,14 +210,26 @@ func censorTCPWithFilter(wg *sync.WaitGroup, filter string) {
 
 // Start starts the injector
 func Start() {
-	if *networkInterface == "" {
-		log.Warn("injector: no interface specified")
-		return
+	if interfaces == nil {
+		all, err := pcap.FindAllDevs()
+		rtx.Must(err, "pcap.FindAllDevs failed")
+		for _, iface := range all {
+			for _, address := range iface.Addresses {
+				ipaddr := address.IP.String()
+				if ipaddr != "127.0.0.1" && !strings.Contains(ipaddr, ":") {
+					interfaces = append(interfaces, iface.Name)
+					break
+				}
+			}
+		}
 	}
 	var wg sync.WaitGroup
-	wg.Add(3)
-	go censorDNS(&wg)
-	go censorTCPWithFilter(&wg, "ip and tcp and dst port 80")
-	go censorTCPWithFilter(&wg, "ip and tcp and dst port 443")
+	wg.Add(3 * len(interfaces))
+	for _, ifname := range interfaces {
+		log.Infof("pktinjector: listening on: %s", ifname)
+		go censorDNS(ifname, &wg)
+		go censorTCPWithFilter(ifname, &wg, "ip and tcp and dst port 443")
+		go censorTCPWithFilter(ifname, &wg, "ip and tcp and dst port 80")
+	}
 	wg.Wait()
 }

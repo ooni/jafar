@@ -12,33 +12,23 @@ We use Go >= 1.11. With:
 go build -v .
 ```
 
-you compile Jafar. Then try `./jafar` to get help. Runs as root.
+you compile Jafar. You need to run Jafar as root. Get brief help with
+`./jafar -help`, or read on for more details.
 
 ## pktinjector
 
-The `pktinjector` module will listen on a specific interface and inject
-NXDOMAIN DNS responses or TCP RST segments when it encounters specific
-keywords. This mechanism is not deterministic, but does not require you
-to modify in any way the censorship measurement tool you're testing.
+The `-censor <string>` flag turns on censorship as follows:
 
-```
--pktinjector.network-interface <interfaceName>
--pktinjector.nxdomain-if-match <pattern>
--pktinjector.redirect-if-match <pattern>
--pktinjector.reset-if-match    <pattern>
-```
+1. any DNS query containing `<string>` will receive an injected response
+for IN, A with a RR pointing to `127.0.0.1`;
 
-The first flag is required to activate this module. It tells what is the
-interface where to listen for packets and react accordingly.
+2. any TCP packet containing `<string>` will elicit an injected RST segment.
 
-The second flag can be specified multiple times. It installs pattern filters
-that, when matched, cause this module to inject an NXDOMAIN reply.
+You can specfiy `-censor` more than once.
 
-The third flag is like the second except that it returns a valid DNS reply
-of type A, class IN, where the IP address is 127.0.0.1.
-
-The fourth flag can be specified multiple times. It installs a filter for which,
-whenever the pattern is mached in a packet payload, a RST segment is injected.
+By default, we listen on all interfaces where there is a configured IPv4
+address different from `127.0.0.1`. Use `-interface <name>` to listen on a
+specific interface. You can specify `-interface` more than once.
 
 ## dnsproxy
 
