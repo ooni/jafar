@@ -3,6 +3,8 @@ package pktinjector
 
 import (
 	"flag"
+	"math"
+	"net"
 	"strings"
 
 	"github.com/apex/log"
@@ -16,18 +18,21 @@ import (
 var (
 	networkInterface = flag.String("pktinjector.network-interface", "",
 		"interface where to possibly inject packets")
-	domains  flagx.StringArray
-	keywords flagx.StringArray
+	keywords        flagx.StringArray
+	nxdomains       flagx.StringArray
+	redirectDomains flagx.StringArray
 )
 
 func init() {
-	flag.Var(&domains, "pktinjector.nxdomain-if-match",
-		"Inject NXDOMAIN response if query name matches <value>")
 	flag.Var(&keywords, "pktinjector.reset-if-match",
 		"Inject RST segment if TCP segment matches <value>")
+	flag.Var(&nxdomains, "pktinjector.nxdomain-if-match",
+		"Inject NXDOMAIN response if query name matches <value>")
+	flag.Var(&redirectDomains, "pktinjector.redirect-if-match",
+		"Inject 127.0.0.1 response if query name matches <value>")
 }
 
-func censordomain(
+func censorWithNXDOMAIN(
 	handle *pcap.Handle, packet gopacket.Packet, dns *layers.DNS,
 ) {
 	ethLayer := packet.Layer(layers.LayerTypeEthernet)
@@ -76,16 +81,82 @@ func censordomain(
 	}
 }
 
+func censorWithLocalhost(
+	handle *pcap.Handle, packet gopacket.Packet, dns *layers.DNS,
+) {
+	ethLayer := packet.Layer(layers.LayerTypeEthernet)
+	if ethLayer == nil {
+		log.Warn("pktinjector: not an ethernet packet")
+		return
+	}
+	eth := ethLayer.(*layers.Ethernet)
+	srcMAC := eth.SrcMAC
+	eth.SrcMAC = eth.DstMAC
+	eth.DstMAC = srcMAC
+
+	ipLayer := packet.Layer(layers.LayerTypeIPv4)
+	if ipLayer == nil {
+		log.Warn("pktinjector: not an IPv4 packet")
+		return
+	}
+	ip := ipLayer.(*layers.IPv4)
+	srcIP := ip.SrcIP
+	ip.SrcIP = ip.DstIP
+	ip.DstIP = srcIP
+
+	udpLayer := packet.Layer(layers.LayerTypeUDP)
+	if udpLayer == nil {
+		log.Warn("pktinjector: not an UDP packet")
+		return
+	}
+	udp := udpLayer.(*layers.UDP)
+	srcPort := udp.SrcPort
+	udp.SrcPort = udp.DstPort
+	udp.DstPort = srcPort
+	udp.SetNetworkLayerForChecksum(ip)
+
+	dns.QR = true
+	dns.RA = true
+	dns.RD = true
+	dns.ResponseCode = layers.DNSResponseCodeNoErr
+	dns.ANCount = 1
+	dns.Answers = []layers.DNSResourceRecord{
+		layers.DNSResourceRecord{
+			Name:  dns.Questions[0].Name,
+			Type:  layers.DNSTypeA,
+			Class: layers.DNSClassIN,
+			TTL:   math.MaxInt32,
+			IP:    net.IPv4(127, 0, 0, 1),
+		},
+	}
+
+	buffer := gopacket.NewSerializeBuffer()
+	gopacket.SerializeLayers(buffer, gopacket.SerializeOptions{
+		FixLengths:       true,
+		ComputeChecksums: true,
+	}, eth, ip, udp, dns)
+	if err := handle.WritePacketData(buffer.Bytes()); err != nil {
+		log.WithError(err).Warn("handle.WritePacketData failed")
+	}
+}
+
 func processdns(
 	handle *pcap.Handle, packet gopacket.Packet, dns *layers.DNS,
 ) {
 	if dns.QR == false {
 		for _, question := range dns.Questions {
 			name := string(question.Name)
-			for _, domain := range domains {
+			for _, domain := range nxdomains {
 				if strings.Contains(name, domain) {
-					log.Infof("pktinjector: will DNS-censor: %s", name)
-					censordomain(handle, packet, dns)
+					log.Infof("pktinjector: will NXDOMAIN-inject: %s", name)
+					censorWithNXDOMAIN(handle, packet, dns)
+					return
+				}
+			}
+			for _, domain := range redirectDomains {
+				if strings.Contains(name, domain) {
+					log.Infof("pktinjector: will 127.0.0.1-redirect: %s", name)
+					censorWithLocalhost(handle, packet, dns)
 					return
 				}
 			}
@@ -93,7 +164,7 @@ func processdns(
 	}
 }
 
-func censortcp(
+func censorWithRST(
 	handle *pcap.Handle, packet gopacket.Packet, tcp *layers.TCP,
 ) {
 	ethLayer := packet.Layer(layers.LayerTypeEthernet)
@@ -157,7 +228,7 @@ func processtcp(
 		for _, keyword := range keywords {
 			if strings.Contains(payload, keyword) {
 				log.Infof("pktinjector: will RST-censor: %s", keyword)
-				censortcp(handle, packet, tcp)
+				censorWithRST(handle, packet, tcp)
 				return
 			}
 		}
