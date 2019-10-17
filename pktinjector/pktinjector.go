@@ -14,19 +14,16 @@ import (
 	"github.com/google/gopacket/pcap"
 	"github.com/m-lab/go/flagx"
 	"github.com/m-lab/go/rtx"
+	"github.com/ooni/jafar/conf"
 )
 
 var (
 	interfaces flagx.StringArray
-	patterns   flagx.StringArray
 )
 
 func init() {
 	flag.Var(
 		&interfaces, "interface", "Add interface where to censor",
-	)
-	flag.Var(
-		&patterns, "censor", "Add a domain to censor",
 	)
 }
 
@@ -119,7 +116,7 @@ func censorDNS(ifname string, wg *sync.WaitGroup) {
 		dns := dnslayer.(*layers.DNS)
 		for _, question := range dns.Questions {
 			name := string(question.Name)
-			for _, domain := range patterns {
+			for _, domain := range conf.Patterns {
 				if strings.Contains(name, domain) {
 					log.Infof("pktinjector: will 127.0.0.1-redirect: %s", name)
 					censorWithLocalhost(handle, packet, dns)
@@ -198,7 +195,7 @@ func censorTCPWithFilter(ifname string, wg *sync.WaitGroup, filter string) {
 		}
 		tcp := tcplayer.(*layers.TCP)
 		payload := string(tcp.LayerPayload())
-		for _, keyword := range patterns {
+		for _, keyword := range conf.Patterns {
 			if strings.Contains(payload, keyword) {
 				log.Infof("pktinjector: will RST-censor: %s", keyword)
 				censorWithRST(handle, packet, tcp)
