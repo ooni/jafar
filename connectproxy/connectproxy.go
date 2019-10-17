@@ -20,7 +20,7 @@ var keywords flagx.StringArray
 func init() {
 	flag.Var(
 		&keywords, "connectproxy.reset-if-match",
-		"RST flow if <value> found at beginning of stream",
+		"RST flow if <value> found inside a stream",
 	)
 }
 
