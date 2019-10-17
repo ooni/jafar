@@ -10,6 +10,7 @@ import (
 	"github.com/ooni/jafar/httpproxy"
 	"github.com/ooni/jafar/pktinjector"
 	"github.com/ooni/jafar/resolver"
+	"github.com/ooni/jafar/tlsproxy"
 )
 
 func main() {
@@ -17,6 +18,7 @@ func main() {
 	go httpproxy.Start()
 	go pktinjector.Start()
 	go resolver.Start()
+	go tlsproxy.Start()
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, os.Interrupt)
 	<-ch
