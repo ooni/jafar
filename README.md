@@ -24,23 +24,27 @@ This module sniffs packets on one or more interfaces. Use
 which interface(s) to use. Otherwise, we'll pick all interfaces
 with an assigned IPv4 different from `127.0.0.1`.
 
-The `-pktinjector-dns-hijack <value>` flag adds a rule such that we
-will inject a DNS reply for `127.0.0.1` whenever we see `<value>`
-inside an outgoing DNS query. Note that this redirection will cause traffic
-to be receivied by the `httpproxy` or `tlsproxy` modules.
+The `-pktinjector-rst <value>` flag adds a rule such that we
+will inject a RST segment whenever we see `<value>` inside an
+outgoing TCP segment query.
 
-The `-pktinjector-dns-blackhole <value>` flag is similar but the injected
-DNS response will be for `127.0.0.2` typically causing timeouts.
+## module: resolver
 
-The `-pktinjector-dns-block <value>` flag is similar but the
-injected DNS response will be `NXDOMAIN`
+This module is a stub resolver. You should configure it as your
+resolver on your system to simulate censorship.
 
-The `-pktinjector-rst <value>` is similar but operates on TCP segments, and
-injects RST segments in the stream if it sees `<value>`.
+By default, the resolver listens on `127.0.0.1:53` and you can use the
+`-resolver-address <address>` flag to change that. It will forward
+all queries to the configured DNS upstream (`8.8.8.8:53` by default,
+use the `-resolver-upstream` to change that).
 
-Because of the intrinsic race condition, this module is not deterministic
-and, especially for DNS, and sometimes you get the correct answer. This may
-also be seen as an interesting feature.
+The `-resolver-blackhole <value>` flag adds a rule such that the
+resolver returns `127.0.0.2` for queries containing `<value>`.
+
+The `-resolver-block <value>` is like above but returns `NXDOMAIN`.
+
+The `-resolver-hijack <value>` is like above but redirects on
+`127.0.0.1` where we have `httpproxy` and `tlsproxy`.
 
 ## module: httpproxy
 
@@ -56,15 +60,3 @@ and you can use `-httpproxy-address <address>` to change that.
 
 This module is like `httpproxy` except that it uses SNI to find
 out what server to connect to, rather than the `Host` header.
-
-## module: resolver
-
-This module has the same DNS functionality as of `pktinjector`
-except that they're implemented by a stub resolver. You must
-configure your censorship measurement tool to use this specific
-stub resolver, otherwise it will just sit idle.
-
-By default, the resolver listens on `127.0.0.1:53` and you can use the
-`-resolver-address <address>` flag to change that. It will forward
-all queries to the configured DNS upstream (`8.8.8.8:53` by default,
-use the `-resolver-upstream` to change that).

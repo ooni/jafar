@@ -3,8 +3,6 @@ package pktinjector
 
 import (
 	"flag"
-	"math"
-	"net"
 	"strings"
 	"sync"
 
@@ -17,29 +15,14 @@ import (
 )
 
 var (
-	blackholeWithDNSInjection flagx.StringArray
-	blockWithDNSInjection     flagx.StringArray
-	blockWithRSTInjection     flagx.StringArray
-	hijackWithDNSInjection    flagx.StringArray
-	interfaces                flagx.StringArray
+	blockWithRSTInjection flagx.StringArray
+	interfaces            flagx.StringArray
 )
 
 func init() {
 	flag.Var(
-		&blackholeWithDNSInjection, "pktinjector-dns-blackhole",
-		"Use DNS injection to blackhole DNS queries containing <value>",
-	)
-	flag.Var(
-		&blockWithDNSInjection, "pktinjector-dns-block",
-		"Block DNS resolution by injecting a NXDOMAIN if query contains <value>",
-	)
-	flag.Var(
 		&blockWithRSTInjection, "pktinjector-rst",
 		"Block TCP stream containing <value> using RST injection",
-	)
-	flag.Var(
-		&hijackWithDNSInjection, "pktinjector-dns-hijack",
-		"Use DNS injection to hijack DNS queries containing <value>",
 	)
 	flag.Var(
 		&interfaces, "pktinjector-interface",
@@ -62,114 +45,6 @@ func newPcapHandleWithFilter(ifname, filter string) *pcap.Handle {
 	err = handle.SetBPFFilter(filter)
 	rtx.Must(err, "handle.SetBPFFilter failed")
 	return handle
-}
-
-func doCensorWithInjectedReply(
-	handle *pcap.Handle, packet gopacket.Packet,
-	dns *layers.DNS, redirectTo net.IP,
-) {
-	ethLayer := packet.Layer(layers.LayerTypeEthernet)
-	if ethLayer == nil {
-		log.Warn("pktinjector: not an ethernet packet")
-		return
-	}
-	eth := ethLayer.(*layers.Ethernet)
-	srcMAC := eth.SrcMAC
-	eth.SrcMAC = eth.DstMAC
-	eth.DstMAC = srcMAC
-
-	ipLayer := packet.Layer(layers.LayerTypeIPv4)
-	if ipLayer == nil {
-		log.Warn("pktinjector: not an IPv4 packet")
-		return
-	}
-	ip := ipLayer.(*layers.IPv4)
-	srcIP := ip.SrcIP
-	ip.SrcIP = ip.DstIP
-	ip.DstIP = srcIP
-
-	udpLayer := packet.Layer(layers.LayerTypeUDP)
-	if udpLayer == nil {
-		log.Warn("pktinjector: not an UDP packet")
-		return
-	}
-	udp := udpLayer.(*layers.UDP)
-	srcPort := udp.SrcPort
-	udp.SrcPort = udp.DstPort
-	udp.DstPort = srcPort
-	udp.SetNetworkLayerForChecksum(ip)
-
-	dns.QR = true
-	dns.RA = true
-	dns.RD = true
-	if redirectTo != nil {
-		dns.ResponseCode = layers.DNSResponseCodeNoErr
-		dns.ANCount = 1
-		dns.Answers = []layers.DNSResourceRecord{
-			layers.DNSResourceRecord{
-				Name:  dns.Questions[0].Name,
-				Type:  layers.DNSTypeA,
-				Class: layers.DNSClassIN,
-				TTL:   math.MaxInt32,
-				IP:    redirectTo,
-			},
-		}
-	} else {
-		dns.ResponseCode = layers.DNSResponseCodeNXDomain
-	}
-
-	buffer := gopacket.NewSerializeBuffer()
-	gopacket.SerializeLayers(buffer, gopacket.SerializeOptions{
-		FixLengths:       true,
-		ComputeChecksums: true,
-	}, eth, ip, udp, dns)
-	if err := handle.WritePacketData(buffer.Bytes()); err != nil {
-		log.WithError(err).Warn("handle.WritePacketData failed")
-	}
-}
-
-func censorDNS(ifname string, wg *sync.WaitGroup) {
-	defer wg.Done()
-	handle := newPcapHandleWithFilter(ifname, "ip and udp and dst port 53")
-	defer handle.Close()
-	source := gopacket.NewPacketSource(handle, handle.LinkType())
-	for packet := range source.Packets() {
-		dnslayer := packet.Layer(layers.LayerTypeDNS)
-		if dnslayer == nil {
-			continue
-		}
-		dns := dnslayer.(*layers.DNS)
-		for _, question := range dns.Questions {
-			name := string(question.Name)
-			for _, pattern := range blockWithDNSInjection {
-				if strings.Contains(name, pattern) {
-					log.Infof("pktinjector: will NXDOMAIN: %s", name)
-					doCensorWithInjectedReply(
-						handle, packet, dns, nil,
-					)
-					break
-				}
-			}
-			for _, pattern := range blackholeWithDNSInjection {
-				if strings.Contains(name, pattern) {
-					log.Infof("pktinjector: will 127.0.0.2-redirect: %s", name)
-					doCensorWithInjectedReply(
-						handle, packet, dns, net.IPv4(127, 0, 0, 2),
-					)
-					break
-				}
-			}
-			for _, pattern := range hijackWithDNSInjection {
-				if strings.Contains(name, pattern) {
-					log.Infof("pktinjector: will 127.0.0.1-redirect: %s", name)
-					doCensorWithInjectedReply(
-						handle, packet, dns, net.IPv4(127, 0, 0, 1),
-					)
-					break
-				}
-			}
-		}
-	}
 }
 
 func doCensorWithRST(
@@ -266,10 +141,9 @@ func Start() {
 		}
 	}
 	var wg sync.WaitGroup
-	wg.Add(3 * len(interfaces))
+	wg.Add(2 * len(interfaces))
 	for _, ifname := range interfaces {
 		log.Infof("pktinjector: listening on: %s", ifname)
-		go censorDNS(ifname, &wg)
 		go censorTCPWithFilter(ifname, &wg, "ip and tcp and dst port 443")
 		go censorTCPWithFilter(ifname, &wg, "ip and tcp and dst port 80")
 	}
