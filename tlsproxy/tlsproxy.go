@@ -24,7 +24,7 @@ var (
 
 func init() {
 	flag.Var(
-		&blocked, "tlsproxy-blocked",
+		&blocked, "tlsproxy-block",
 		"Censor requests via TLS proxy if client hello contains <value>",
 	)
 }

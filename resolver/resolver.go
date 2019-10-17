@@ -18,8 +18,10 @@ var (
 		"resolver-address", "127.0.0.1:53",
 		"Address where this stub DNS resolver should listen",
 	)
-	blocked  flagx.StringArray
-	upstream = flag.String(
+	blackholed flagx.StringArray
+	blocked    flagx.StringArray
+	hijacked   flagx.StringArray
+	upstream   = flag.String(
 		"resolver-upstream", "8.8.8.8:53",
 		"Upstream DNS resolver to be used by the this resolver",
 	)
@@ -27,8 +29,16 @@ var (
 
 func init() {
 	flag.Var(
-		&blocked, "resolver-blocked",
+		&blackholed, "resolver-blackhole",
+		"Return 127.0.0.2 for queries received by resolver containing <value>",
+	)
+	flag.Var(
+		&blocked, "resolver-block",
 		"Censor with NXDOMAIN queries received by resolver containing <value>",
+	)
+	flag.Var(
+		&hijacked, "resolver-hijack",
+		"Return 127.0.0.1 for queries received by resolver containing <value>",
 	)
 }
 
@@ -61,20 +71,48 @@ func roundtrip(w dns.ResponseWriter, r *dns.Msg) error {
 	return nil
 }
 
-func blockdomain(w dns.ResponseWriter, r *dns.Msg) {
-	log.Infof("blockdomain: %s", r.Question[0].Name)
+func meddletrip(w dns.ResponseWriter, r *dns.Msg, redirectTo net.IP) {
+	log.Infof("meddletrip: %s %+v", r.Question[0].Name, redirectTo)
 	m := new(dns.Msg)
-	m.SetRcode(r, dns.RcodeNameError)
 	m.Compress = true
 	m.MsgHdr.RecursionAvailable = true
+	m.SetReply(r)
+	if redirectTo != nil {
+		switch r.Question[0].Qtype {
+		case dns.TypeA:
+			m.Answer = append(m.Answer, &dns.A{
+				Hdr: dns.RR_Header{
+					Name:   r.Question[0].Name,
+					Rrtype: dns.TypeA,
+					Class:  dns.ClassINET,
+					Ttl:    0,
+				},
+				A: redirectTo,
+			})
+		}
+	} else {
+		m.SetRcode(r, dns.RcodeNameError)
+	}
 	w.WriteMsg(m)
 }
 
 func handle(w dns.ResponseWriter, r *dns.Msg) {
 	name := r.Question[0].Name
+	for _, pattern := range blackholed {
+		if strings.Contains(name, pattern) {
+			meddletrip(w, r, net.IPv4(127, 0, 0, 2))
+			return
+		}
+	}
 	for _, pattern := range blocked {
 		if strings.Contains(name, pattern) {
-			blockdomain(w, r)
+			meddletrip(w, r, nil)
+			return
+		}
+	}
+	for _, pattern := range hijacked {
+		if strings.Contains(name, pattern) {
+			meddletrip(w, r, net.IPv4(127, 0, 0, 1))
 			return
 		}
 	}

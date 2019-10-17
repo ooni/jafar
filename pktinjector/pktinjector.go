@@ -17,22 +17,32 @@ import (
 )
 
 var (
-	censorWithDNSInjection flagx.StringArray
-	censorWithRSTInjection flagx.StringArray
-	interfaces             flagx.StringArray
+	blackholeWithDNSInjection flagx.StringArray
+	blockWithDNSInjection     flagx.StringArray
+	blockWithRSTInjection     flagx.StringArray
+	hijackWithDNSInjection    flagx.StringArray
+	interfaces                flagx.StringArray
 )
 
 func init() {
 	flag.Var(
-		&censorWithDNSInjection, "censor-with-dns-injection",
-		"Censor DNS queries containing <value> with DNS injection",
+		&blackholeWithDNSInjection, "pktinjector-dns-blackhole",
+		"Use DNS injection to blackhole DNS queries containing <value>",
 	)
 	flag.Var(
-		&censorWithRSTInjection, "censor-with-rst-injection",
-		"Censor TCP segments containing <value> with RST injection",
+		&blockWithDNSInjection, "pktinjector-dns-block",
+		"Block DNS resolution by injecting a NXDOMAIN if query contains <value>",
 	)
 	flag.Var(
-		&interfaces, "censor-interface",
+		&blockWithRSTInjection, "pktinjector-rst",
+		"Block TCP stream containing <value> using RST injection",
+	)
+	flag.Var(
+		&hijackWithDNSInjection, "pktinjector-dns-hijack",
+		"Use DNS injection to hijack DNS queries containing <value>",
+	)
+	flag.Var(
+		&interfaces, "pktinjector-interface",
 		"Apply censorship rules on traffic on interface named <value>",
 	)
 }
@@ -55,7 +65,8 @@ func newPcapHandleWithFilter(ifname, filter string) *pcap.Handle {
 }
 
 func doCensorWithInjectedReply(
-	handle *pcap.Handle, packet gopacket.Packet, dns *layers.DNS,
+	handle *pcap.Handle, packet gopacket.Packet,
+	dns *layers.DNS, redirectTo net.IP,
 ) {
 	ethLayer := packet.Layer(layers.LayerTypeEthernet)
 	if ethLayer == nil {
@@ -91,16 +102,20 @@ func doCensorWithInjectedReply(
 	dns.QR = true
 	dns.RA = true
 	dns.RD = true
-	dns.ResponseCode = layers.DNSResponseCodeNoErr
-	dns.ANCount = 1
-	dns.Answers = []layers.DNSResourceRecord{
-		layers.DNSResourceRecord{
-			Name:  dns.Questions[0].Name,
-			Type:  layers.DNSTypeA,
-			Class: layers.DNSClassIN,
-			TTL:   math.MaxInt32,
-			IP:    net.IPv4(127, 0, 0, 1),
-		},
+	if redirectTo != nil {
+		dns.ResponseCode = layers.DNSResponseCodeNoErr
+		dns.ANCount = 1
+		dns.Answers = []layers.DNSResourceRecord{
+			layers.DNSResourceRecord{
+				Name:  dns.Questions[0].Name,
+				Type:  layers.DNSTypeA,
+				Class: layers.DNSClassIN,
+				TTL:   math.MaxInt32,
+				IP:    redirectTo,
+			},
+		}
+	} else {
+		dns.ResponseCode = layers.DNSResponseCodeNXDomain
 	}
 
 	buffer := gopacket.NewSerializeBuffer()
@@ -126,10 +141,30 @@ func censorDNS(ifname string, wg *sync.WaitGroup) {
 		dns := dnslayer.(*layers.DNS)
 		for _, question := range dns.Questions {
 			name := string(question.Name)
-			for _, pattern := range censorWithDNSInjection {
+			for _, pattern := range blockWithDNSInjection {
+				if strings.Contains(name, pattern) {
+					log.Infof("pktinjector: will NXDOMAIN: %s", name)
+					doCensorWithInjectedReply(
+						handle, packet, dns, nil,
+					)
+					break
+				}
+			}
+			for _, pattern := range blackholeWithDNSInjection {
+				if strings.Contains(name, pattern) {
+					log.Infof("pktinjector: will 127.0.0.2-redirect: %s", name)
+					doCensorWithInjectedReply(
+						handle, packet, dns, net.IPv4(127, 0, 0, 2),
+					)
+					break
+				}
+			}
+			for _, pattern := range hijackWithDNSInjection {
 				if strings.Contains(name, pattern) {
 					log.Infof("pktinjector: will 127.0.0.1-redirect: %s", name)
-					doCensorWithInjectedReply(handle, packet, dns)
+					doCensorWithInjectedReply(
+						handle, packet, dns, net.IPv4(127, 0, 0, 1),
+					)
 					break
 				}
 			}
@@ -205,7 +240,7 @@ func censorTCPWithFilter(ifname string, wg *sync.WaitGroup, filter string) {
 		}
 		tcp := tcplayer.(*layers.TCP)
 		payload := string(tcp.LayerPayload())
-		for _, pattern := range censorWithRSTInjection {
+		for _, pattern := range blockWithRSTInjection {
 			if strings.Contains(payload, pattern) {
 				log.Infof("pktinjector: will RST-censor: %s", pattern)
 				doCensorWithRST(handle, packet, tcp)

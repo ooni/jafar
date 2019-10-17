@@ -23,7 +23,7 @@ var (
 
 func init() {
 	flag.Var(
-		&blocked, "httpproxy-blocked",
+		&blocked, "httpproxy-block",
 		"Censor with 451 HTTP requests via proxy if host contains <value>",
 	)
 }

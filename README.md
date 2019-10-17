@@ -19,34 +19,52 @@ Jafar is composed of modules. Each modules is controllable via flags.
 
 ## module: pktinjector
 
-This module sniffs packets on one or more interfaces. Use `-censor-interface`
-to specify which interface(s) to use. Otherwise, we'll pick all interfaces with
-an assigned IPv4 different from `127.0.0.1`.
+This module sniffs packets on one or more interfaces. Use
+`-pktinjector-interface`, possibly multiple times, to specify
+which interface(s) to use. Otherwise, we'll pick all interfaces
+with an assigned IPv4 different from `127.0.0.1`.
 
-The `-censor-with-dns-injection <value>` flag adds a rule such that we'll
-send a DNS injection response for `127.0.0.1` whenever we see `<value`>`
-inside an outgoing DNS query. The `-censor-with-rst-injection <value>` is
-similar but operates on TCP segments.
+The `-pktinjector-dns-hijack <value>` flag adds a rule such that we
+will inject a DNS reply for `127.0.0.1` whenever we see `<value>`
+inside an outgoing DNS query. Note that this redirection will cause traffic
+to be receivied by the `httpproxy` or `tlsproxy` modules.
+
+The `-pktinjector-dns-blackhole <value>` flag is similar but the injected
+DNS response will be for `127.0.0.2` typically causing timeouts.
+
+The `-pktinjector-dns-block <value>` flag is similar but the
+injected DNS response will be `NXDOMAIN`
+
+The `-pktinjector-rst <value>` is similar but operates on TCP segments, and
+injects RST segments in the stream if it sees `<value>`.
+
+Because of the intrinsic race condition, this module is not deterministic
+and, especially for DNS, and sometimes you get the correct answer. This may
+also be seen as an interesting feature.
 
 ## module: httpproxy
 
-When you `-censor-with-dns-injection <value>` you are redirected to
-`127.0.0.1`. The httpproxy module is here for taking care of these
-redirected requests. If you used any `-httpproxy-blocked <value>`, we
+When you use DNS-injection-based hijacking (see above) you are redirected
+to `127.0.0.1`. The httpproxy module is here for taking care of these
+redirected requests. If you used any `-httpproxy-block <value>`, we
 will return `451` if the `Host` header contains `<value>`. Otherwise,
 we'll use the `Host` header to issue a request and return you the
 corresponding HTTP response. We listen on `127.0.0.1:80` by default
 and you can use `-httpproxy-address <address>` to change that.
 
+## module: tlsproxy
+
+This module is like `httpproxy` except that it uses SNI to find
+out what server to connect to, rather than the `Host` header.
+
 ## module: resolver
 
-The DNS injection implementation returns a bogus IP address by
-default. To test the case where a server returns `NXDOMAIN` for
-a resource, you can use the builtin DNS resolver. By default,
-it listens on `127.0.0.1:53` and you can use `-resolver-address
-<address>` to change that. It will forward all queries to the
-configured DNS upstream (`8.8.8.8:53` by default, use the
-`-resolver-upstream` to change that). However, if you have
-specified one or more `-resolver-blocked <value>` flags and
-the DNS query contains a `<value>`, the query won't be forwarded
-to the upstream. Instead we'll return `NXDOMAIN` immediately.
+This module has the same DNS functionality as of `pktinjector`
+except that they're implemented by a stub resolver. You must
+configure your censorship measurement tool to use this specific
+stub resolver, otherwise it will just sit idle.
+
+By default, the resolver listens on `127.0.0.1:53` and you can use the
+`-resolver-address <address>` flag to change that. It will forward
+all queries to the configured DNS upstream (`8.8.8.8:53` by default,
+use the `-resolver-upstream` to change that).
