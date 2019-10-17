@@ -6,6 +6,7 @@ import (
 	"math"
 	"net"
 	"strings"
+	"sync"
 
 	"github.com/apex/log"
 	"github.com/google/gopacket"
@@ -140,24 +141,34 @@ func censorWithLocalhost(
 	}
 }
 
-func processdns(
-	handle *pcap.Handle, packet gopacket.Packet, dns *layers.DNS,
-) {
-	if dns.QR == false {
+func filterDNS(wg *sync.WaitGroup) {
+	defer wg.Done()
+	handle, err := pcap.OpenLive(*networkInterface, 256, false, pcap.BlockForever)
+	rtx.Must(err, "pcap.OpenLive failed")
+	defer handle.Close()
+	err = handle.SetBPFFilter("ip and udp and dst port 53")
+	rtx.Must(err, "handle.SetBPFFilter failed")
+	source := gopacket.NewPacketSource(handle, handle.LinkType())
+	for packet := range source.Packets() {
+		dnslayer := packet.Layer(layers.LayerTypeDNS)
+		if dnslayer == nil {
+			continue
+		}
+		dns := dnslayer.(*layers.DNS)
 		for _, question := range dns.Questions {
 			name := string(question.Name)
 			for _, domain := range nxdomains {
 				if strings.Contains(name, domain) {
 					log.Infof("pktinjector: will NXDOMAIN-inject: %s", name)
 					censorWithNXDOMAIN(handle, packet, dns)
-					return
+					break
 				}
 			}
 			for _, domain := range redirectDomains {
 				if strings.Contains(name, domain) {
 					log.Infof("pktinjector: will 127.0.0.1-redirect: %s", name)
 					censorWithLocalhost(handle, packet, dns)
-					return
+					break
 				}
 			}
 		}
@@ -220,29 +231,28 @@ func censorWithRST(
 	}
 }
 
-func processtcp(
-	handle *pcap.Handle, packet gopacket.Packet, tcp *layers.TCP,
-) {
-	if tcp.DstPort == 80 || tcp.DstPort == 443 {
+func filterTCP(wg *sync.WaitGroup) {
+	defer wg.Done()
+	handle, err := pcap.OpenLive(*networkInterface, 256, false, pcap.BlockForever)
+	rtx.Must(err, "pcap.OpenLive failed")
+	defer handle.Close()
+	err = handle.SetBPFFilter("ip and tcp and (dst port 80 or dst port 443)")
+	rtx.Must(err, "handle.SetBPFFilter failed")
+	source := gopacket.NewPacketSource(handle, handle.LinkType())
+	for packet := range source.Packets() {
+		tcplayer := packet.Layer(layers.LayerTypeTCP)
+		if tcplayer == nil {
+			continue
+		}
+		tcp := tcplayer.(*layers.TCP)
 		payload := string(tcp.LayerPayload())
 		for _, keyword := range keywords {
 			if strings.Contains(payload, keyword) {
 				log.Infof("pktinjector: will RST-censor: %s", keyword)
 				censorWithRST(handle, packet, tcp)
-				return
+				break
 			}
 		}
-	}
-}
-
-func process(handle *pcap.Handle, packet gopacket.Packet) {
-	dnslayer := packet.Layer(layers.LayerTypeDNS)
-	if dnslayer != nil {
-		processdns(handle, packet, dnslayer.(*layers.DNS))
-	}
-	tcplayer := packet.Layer(layers.LayerTypeTCP)
-	if tcplayer != nil {
-		processtcp(handle, packet, tcplayer.(*layers.TCP))
 	}
 }
 
@@ -252,11 +262,9 @@ func Start() {
 		log.Warn("injector: no interface specified")
 		return
 	}
-	handle, err := pcap.OpenLive(*networkInterface, 1600, false, pcap.BlockForever)
-	rtx.Must(err, "pcap.OpenLive failed")
-	defer handle.Close()
-	source := gopacket.NewPacketSource(handle, handle.LinkType())
-	for packet := range source.Packets() {
-		process(handle, packet)
-	}
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go filterDNS(&wg)
+	go filterTCP(&wg)
+	wg.Wait()
 }
