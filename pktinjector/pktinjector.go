@@ -55,7 +55,7 @@ func newPcapHandleWithFilter(ifname, filter string) *pcap.Handle {
 	rtx.Must(err, "inactive.SetImmediateMode failed")
 	err = inactive.SetPromisc(false)
 	rtx.Must(err, "inactive.SetPromisc failed")
-	err = inactive.SetSnapLen(256)
+	err = inactive.SetSnapLen(512)
 	rtx.Must(err, "inactive.SetSnapLen failed")
 	handle, err := inactive.Activate()
 	rtx.Must(err, "inactive.Activate failed")
