@@ -158,7 +158,7 @@ func censorWithLocalhost(
 	}
 }
 
-func filterDNS(wg *sync.WaitGroup) {
+func censorDNS(wg *sync.WaitGroup) {
 	defer wg.Done()
 	handle := newPcapHandleWithFilter("ip and udp and dst port 53")
 	defer handle.Close()
@@ -245,11 +245,9 @@ func censorWithRST(
 	}
 }
 
-func filterTCP(wg *sync.WaitGroup) {
+func censorTCPWithFilter(wg *sync.WaitGroup, filter string) {
 	defer wg.Done()
-	handle := newPcapHandleWithFilter(
-		"ip and tcp and (dst port 80 or dst port 443)",
-	)
+	handle := newPcapHandleWithFilter(filter)
 	defer handle.Close()
 	source := gopacket.NewPacketSource(handle, handle.LinkType())
 	for packet := range source.Packets() {
@@ -276,8 +274,9 @@ func Start() {
 		return
 	}
 	var wg sync.WaitGroup
-	wg.Add(2)
-	go filterDNS(&wg)
-	go filterTCP(&wg)
+	wg.Add(3)
+	go censorDNS(&wg)
+	go censorTCPWithFilter(&wg, "ip and tcp and dst port 80")
+	go censorTCPWithFilter(&wg, "ip and tcp and dst port 443")
 	wg.Wait()
 }
