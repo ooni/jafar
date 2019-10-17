@@ -36,29 +36,28 @@ func hijack(w http.ResponseWriter) (net.Conn, error) {
 	return conn, nil
 }
 
-func splice(wg *sync.WaitGroup, left, right net.Conn, banned bool) {
-	var checkbanned bool
+func splice(wg *sync.WaitGroup, left, right net.Conn) {
 	data := make([]byte, 1<<18)
 	for {
+		// reading data
 		n, err := left.Read(data)
 		if err != nil {
 			break
 		}
-		if !checkbanned && banned {
-			checkbanned = true
-			s := string(data[:n])
-			for _, keyword := range keywords {
-				if strings.Contains(s, keyword) {
-					log.Infof("connectproxy: %s", keyword)
-					if tc, ok := left.(*net.TCPConn); ok {
-						tc.SetLinger(0)
-					}
-					left.Close()
-					right.Close()
-					return
+		// checking for banned keywords
+		s := string(data[:n])
+		for _, keyword := range keywords {
+			if strings.Contains(s, keyword) {
+				log.Infof("connectproxy: %s", keyword)
+				if tc, ok := left.(*net.TCPConn); ok {
+					tc.SetLinger(0) // do our due diligence to RST
 				}
+				left.Close()
+				right.Close()
+				return
 			}
 		}
+		// forwarding data
 		_, err = right.Write(data[:n])
 		if err != nil {
 			break
@@ -89,8 +88,8 @@ func connector(w http.ResponseWriter, r *http.Request) {
 	}
 	var wg sync.WaitGroup
 	wg.Add(2)
-	go splice(&wg, clientconn, serverconn, true)
-	go splice(&wg, serverconn, clientconn, false)
+	go splice(&wg, clientconn, serverconn)
+	go splice(&wg, serverconn, clientconn)
 	wg.Wait()
 }
 
