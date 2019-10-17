@@ -116,8 +116,8 @@ func censorDNS(ifname string, wg *sync.WaitGroup) {
 		dns := dnslayer.(*layers.DNS)
 		for _, question := range dns.Questions {
 			name := string(question.Name)
-			for _, domain := range conf.Patterns {
-				if strings.Contains(name, domain) {
+			for _, pattern := range conf.Patterns {
+				if strings.Contains(name, pattern) {
 					log.Infof("pktinjector: will 127.0.0.1-redirect: %s", name)
 					censorWithLocalhost(handle, packet, dns)
 					break
@@ -195,9 +195,9 @@ func censorTCPWithFilter(ifname string, wg *sync.WaitGroup, filter string) {
 		}
 		tcp := tcplayer.(*layers.TCP)
 		payload := string(tcp.LayerPayload())
-		for _, keyword := range conf.Patterns {
-			if strings.Contains(payload, keyword) {
-				log.Infof("pktinjector: will RST-censor: %s", keyword)
+		for _, pattern := range conf.Patterns {
+			if strings.Contains(payload, pattern) {
+				log.Infof("pktinjector: will RST-censor: %s", pattern)
 				censorWithRST(handle, packet, tcp)
 				break
 			}

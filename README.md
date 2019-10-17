@@ -27,13 +27,10 @@ injected DNS reply pointing to `127.0.0.1`.
 3. any query directed to the local DNS proxy containing `<string>` will
 receive a NXDOMAIN response.
 
-4. any request directed to the local HTTP proxy containing `<string>` in
-the headers will receive a 451 response.
+4. any request directed to the local transparent HTTP proxy containing
+`<string>` in the `Host` header will receive a 451 response.
 
-5. anytime the local CONNECT proxy sees as stream of bytes containing
-`<string>` the connection will be closed with RST.
-
-6. anytime the local TLS proxy sees a stream of bytes containing `<string>`
-the connection will be closed with RST.
+5. any TLS handshake directed to the local transparent TLS proxy
+containing `<string>` in the SNI will be ???.
 
 See `./jafar -help` for more tunable flags.

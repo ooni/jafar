@@ -60,13 +60,12 @@ func blockdomain(w dns.ResponseWriter, r *dns.Msg) {
 
 func handle(w dns.ResponseWriter, r *dns.Msg) {
 	name := r.Question[0].Name
-	for _, s := range conf.Patterns {
-		if strings.Contains(name, s) {
+	for _, pattern := range conf.Patterns {
+		if strings.Contains(name, pattern) {
 			blockdomain(w, r)
 			return
 		}
 	}
-	log.Debugf("defaultdns: %s", name)
 	if err := roundtrip(w, r); err != nil {
 		m := new(dns.Msg)
 		m.Compress = true
