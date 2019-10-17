@@ -7,16 +7,16 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/ooni/jafar/dnsproxy"
 	"github.com/ooni/jafar/httpproxy"
 	"github.com/ooni/jafar/pktinjector"
+	"github.com/ooni/jafar/resolver"
 )
 
 func main() {
 	flag.Parse()
-	go dnsproxy.Start()
 	go httpproxy.Start()
 	go pktinjector.Start()
+	go resolver.Start()
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, os.Interrupt)
 	<-ch

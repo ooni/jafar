@@ -14,16 +14,26 @@ import (
 	"github.com/google/gopacket/pcap"
 	"github.com/m-lab/go/flagx"
 	"github.com/m-lab/go/rtx"
-	"github.com/ooni/jafar/conf"
 )
 
 var (
-	interfaces flagx.StringArray
+	censorWithDNSInjection flagx.StringArray
+	censorWithRSTInjection flagx.StringArray
+	interfaces             flagx.StringArray
 )
 
 func init() {
 	flag.Var(
-		&interfaces, "interface", "Add interface where to censor",
+		&censorWithDNSInjection, "censor-with-dns-injection",
+		"Censor DNS queries containing <value> with DNS injection",
+	)
+	flag.Var(
+		&censorWithRSTInjection, "censor-with-rst-injection",
+		"Censor TCP segments containing <value> with RST injection",
+	)
+	flag.Var(
+		&interfaces, "censor-interface",
+		"Apply censorship rules on traffic on interface named <value>",
 	)
 }
 
@@ -44,7 +54,7 @@ func newPcapHandleWithFilter(ifname, filter string) *pcap.Handle {
 	return handle
 }
 
-func censorWithLocalhost(
+func doCensorWithInjectedReply(
 	handle *pcap.Handle, packet gopacket.Packet, dns *layers.DNS,
 ) {
 	ethLayer := packet.Layer(layers.LayerTypeEthernet)
@@ -116,10 +126,10 @@ func censorDNS(ifname string, wg *sync.WaitGroup) {
 		dns := dnslayer.(*layers.DNS)
 		for _, question := range dns.Questions {
 			name := string(question.Name)
-			for _, pattern := range conf.Patterns {
+			for _, pattern := range censorWithDNSInjection {
 				if strings.Contains(name, pattern) {
 					log.Infof("pktinjector: will 127.0.0.1-redirect: %s", name)
-					censorWithLocalhost(handle, packet, dns)
+					doCensorWithInjectedReply(handle, packet, dns)
 					break
 				}
 			}
@@ -127,7 +137,7 @@ func censorDNS(ifname string, wg *sync.WaitGroup) {
 	}
 }
 
-func censorWithRST(
+func doCensorWithRST(
 	handle *pcap.Handle, packet gopacket.Packet, tcp *layers.TCP,
 ) {
 	ethLayer := packet.Layer(layers.LayerTypeEthernet)
@@ -195,10 +205,10 @@ func censorTCPWithFilter(ifname string, wg *sync.WaitGroup, filter string) {
 		}
 		tcp := tcplayer.(*layers.TCP)
 		payload := string(tcp.LayerPayload())
-		for _, pattern := range conf.Patterns {
+		for _, pattern := range censorWithRSTInjection {
 			if strings.Contains(payload, pattern) {
 				log.Infof("pktinjector: will RST-censor: %s", pattern)
-				censorWithRST(handle, packet, tcp)
+				doCensorWithRST(handle, packet, tcp)
 				break
 			}
 		}

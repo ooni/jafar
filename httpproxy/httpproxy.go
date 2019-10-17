@@ -9,35 +9,48 @@ import (
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/m-lab/go/flagx"
 	"github.com/m-lab/go/rtx"
-	"github.com/ooni/jafar/conf"
 )
 
 var (
-	address = flag.String("httpproxy.address", "127.0.0.1:80",
-		"Address where the HTTP transparent proxy should listen")
+	address = flag.String(
+		"httpproxy-address", "127.0.0.1:80",
+		"Address where the HTTP transparent proxy should listen",
+	)
+	blocked flagx.StringArray
 )
 
+func init() {
+	flag.Var(
+		&blocked, "httpproxy-blocked",
+		"Censor with 451 HTTP requests via proxy if host contains <value>",
+	)
+}
+
 func handler(w http.ResponseWriter, r *http.Request) {
-	// TODO(bassosimone): because this is integration testing code, I am
-	// not bothering with making sure one cannot force the proxy to connect
-	// to itself and enter into some kind of infinite loop.
-	URL, err := url.Parse(r.RequestURI)
-	if err != nil {
+	// Implementation note: use Via header to detect in a loose way
+	// requests originated by us and directed to us
+	if r.Header.Get("Via") != "" || r.Host == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	for _, pattern := range conf.Patterns {
-		if strings.Contains(URL.Host, pattern) {
+	for _, pattern := range blocked {
+		if strings.Contains(r.Host, pattern) {
 			w.WriteHeader(http.StatusUnavailableForLegalReasons)
 			return
 		}
 	}
-	r.Header.Del("Proxy-Connection")
+	r.Header.Add("Via", "jafar/0.1.0")
 	resp, err := http.DefaultClient.Do(&http.Request{
-		URL:    URL,
-		Header: r.Header,
 		Body:   r.Body,
+		Header: r.Header,
+		Method: r.Method,
+		URL: &url.URL{
+			Host:   r.Host,
+			Path:   r.RequestURI,
+			Scheme: "http",
+		},
 	})
 	if err != nil {
 		log.WithError(err).Warn("http.DefaultClient.Do failed")

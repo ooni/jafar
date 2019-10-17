@@ -1,5 +1,5 @@
-// Package dnsproxy contains the DNS proxy
-package dnsproxy
+// Package resolver contains the DNS proxy
+package resolver
 
 import (
 	"flag"
@@ -8,20 +8,32 @@ import (
 	"time"
 
 	"github.com/apex/log"
+	"github.com/m-lab/go/flagx"
 	"github.com/m-lab/go/rtx"
 	"github.com/miekg/dns"
-	"github.com/ooni/jafar/conf"
 )
 
 var (
-	address = flag.String("dnsproxy.address", "127.0.0.1:53",
-		"Address where the DNS proxy should listen")
-	upstreamDNS = flag.String("dnsproxy.upstream", "8.8.8.8:53",
-		"Upstream DNS server to use to resolve noncensored input")
+	address = flag.String(
+		"resolver-address", "127.0.0.1:53",
+		"Address where this stub DNS resolver should listen",
+	)
+	blocked  flagx.StringArray
+	upstream = flag.String(
+		"resolver-upstream", "8.8.8.8:53",
+		"Upstream DNS resolver to be used by the this resolver",
+	)
 )
 
+func init() {
+	flag.Var(
+		&blocked, "resolver-blocked",
+		"Censor with NXDOMAIN queries received by resolver containing <value>",
+	)
+}
+
 func roundtrip(w dns.ResponseWriter, r *dns.Msg) error {
-	conn, err := net.Dial("udp", *upstreamDNS)
+	conn, err := net.Dial("udp", *upstream)
 	if err != nil {
 		return err
 	}
@@ -60,7 +72,7 @@ func blockdomain(w dns.ResponseWriter, r *dns.Msg) {
 
 func handle(w dns.ResponseWriter, r *dns.Msg) {
 	name := r.Question[0].Name
-	for _, pattern := range conf.Patterns {
+	for _, pattern := range blocked {
 		if strings.Contains(name, pattern) {
 			blockdomain(w, r)
 			return
