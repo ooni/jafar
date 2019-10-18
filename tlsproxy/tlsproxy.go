@@ -12,6 +12,8 @@ import (
 	"github.com/apex/log"
 	"github.com/m-lab/go/flagx"
 	"github.com/m-lab/go/rtx"
+	"github.com/ooni/netx"
+	"github.com/ooni/netx/handlers"
 )
 
 var (
@@ -131,9 +133,11 @@ func handle(clientconn net.Conn) {
 			return
 		}
 	}
-	serverconn, err := net.Dial("tcp", net.JoinHostPort(sni, "443"))
+	dialer := netx.NewDialer(handlers.StdoutHandler)
+	dialer.ConfigureDNS("dot", "1.1.1.1:853")
+	serverconn, err := dialer.Dial("tcp", net.JoinHostPort(sni, "443"))
 	if err != nil {
-		log.WithError(err).Warn("tlsproxy: net.Dial failed")
+		log.WithError(err).Warn("tlsproxy: dialer.Dial failed")
 		alertclose(clientconn)
 		return
 	}

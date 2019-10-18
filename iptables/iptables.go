@@ -67,9 +67,12 @@ func Start() {
 		}
 	}
 	if *routeDNSTo != "" {
+		// Hijack any DNS query, like the Vodafone station does when using the
+		// secure network feature. Our transparent proxies will use DoT, in order
+		// to bypass this restriction and avoid routing loop.
 		mustExec(
-			"iptables", "-t", "nat", "-A", "OUTPUT", "-p", "udp", "--dport", "53",
-			"-m", "owner", "!", "--uid-owner", "0", "-j", "DNAT", "--to", *routeDNSTo,
+			"iptables", "-t", "nat", "-A", "OUTPUT", "-p", "udp",
+			"--dport", "53", "-j", "DNAT", "--to", *routeDNSTo,
 		)
 	}
 }

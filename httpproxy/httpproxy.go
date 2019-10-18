@@ -11,6 +11,8 @@ import (
 	"github.com/apex/log"
 	"github.com/m-lab/go/flagx"
 	"github.com/m-lab/go/rtx"
+	"github.com/ooni/netx/handlers"
+	"github.com/ooni/netx/httpx"
 )
 
 var (
@@ -19,6 +21,7 @@ var (
 		"Address where the HTTP transparent proxy should listen",
 	)
 	blocked flagx.StringArray
+	client  *httpx.Client
 )
 
 func init() {
@@ -26,6 +29,8 @@ func init() {
 		&blocked, "httpproxy-block",
 		"Censor with 451 HTTP requests via proxy if host contains <value>",
 	)
+	client = httpx.NewClient(handlers.StdoutHandler) // for debugging
+	client.ConfigureDNS("dot", "1.1.1.1:853")        // hopefully non censored
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
@@ -42,7 +47,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	r.Header.Add("Via", "jafar/0.1.0")
-	resp, err := http.DefaultClient.Do(&http.Request{
+	resp, err := client.HTTPClient.Do(&http.Request{
 		Body:   r.Body,
 		Header: r.Header,
 		Method: r.Method,
