@@ -47,7 +47,7 @@ The difference between `drop` and `reset` is that in the former case
 a packet is dropped, in the latter case a RST is sent.
 
 The difference between `ip` and `keyword` flags is that the former
-match an outgonig IP, the latter uses DPI.
+match an outgoing IP, the latter uses DPI.
 
 The `drop` and `reset` rules allow you to simulate, respectively, when
 operations timeout and when a connection cannot be established (with

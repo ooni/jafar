@@ -3,11 +3,10 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"net"
 	"net/http"
-	"os"
-	"os/signal"
 
 	"github.com/m-lab/go/flagx"
 	"github.com/m-lab/go/rtx"
@@ -35,6 +34,9 @@ var (
 	iptablesHijackDNSTo  *string
 	iptablesResetIP      flagx.StringArray
 	iptablesResetKeyword flagx.StringArray
+
+	mainCtx    context.Context
+	mainCancel context.CancelFunc
 
 	tlsProxyAddress      *string
 	tlsProxyBlock        flagx.StringArray
@@ -105,6 +107,9 @@ func init() {
 		"Reset TCP/IP traffic containing the specified keyword",
 	)
 
+	// main
+	mainCtx, mainCancel = context.WithCancel(context.Background())
+
 	// tlsProxy
 	tlsProxyAddress = flag.String(
 		"tls-proxy-address", "127.0.0.1:443",
@@ -167,14 +172,17 @@ func tlsProxyStart() net.Listener {
 	return listener
 }
 
-func main() {
-	flag.Parse()
+func mainWithContext(ctx context.Context) {
 	dnsProxyStart()
 	httpProxyStart()
 	policy := iptablesStart()
 	defer policy.Waive()
 	tlsProxyStart()
-	ch := make(chan os.Signal, 1)
-	signal.Notify(ch, os.Interrupt)
-	<-ch
+	<-ctx.Done()
+}
+
+func main() {
+	flag.Parse()
+	defer mainCancel()
+	mainWithContext(mainCtx)
 }
