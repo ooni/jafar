@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"net"
+	"sync"
 	"testing"
 )
 
@@ -50,7 +51,7 @@ func TestIntegrationFailHandshake(t *testing.T) {
 func TestFailConnectingToSelf(t *testing.T) {
 	proxy := &CensoringProxy{
 		dial: func(network string, address string) (net.Conn, error) {
-			return &mockedConn{}, nil
+			return &mockedConnWriteError{}, nil
 		},
 	}
 	listener, err := proxy.Start("127.0.0.1:0")
@@ -69,7 +70,7 @@ func TestFailConnectingToSelf(t *testing.T) {
 func TestFailWriteAfterConnect(t *testing.T) {
 	proxy := &CensoringProxy{
 		dial: func(network string, address string) (net.Conn, error) {
-			return &mockedConn{
+			return &mockedConnWriteError{
 				// must be different or it refuses connecting to self
 				localIP:  net.IPv4(127, 0, 0, 1),
 				remoteIP: net.IPv4(127, 0, 0, 2),
@@ -147,24 +148,40 @@ func checkdialtls(
 	}
 }
 
-type mockedConn struct {
+type mockedConnWriteError struct {
 	net.Conn
 	localIP  net.IP
 	remoteIP net.IP
 }
 
-func (c *mockedConn) Write(b []byte) (int, error) {
+func (c *mockedConnWriteError) Write(b []byte) (int, error) {
 	return 0, errors.New("cannot write sorry")
 }
 
-func (c *mockedConn) LocalAddr() net.Addr {
+func (c *mockedConnWriteError) LocalAddr() net.Addr {
 	return &net.TCPAddr{
 		IP: c.localIP,
 	}
 }
 
-func (c *mockedConn) RemoteAddr() net.Addr {
+func (c *mockedConnWriteError) RemoteAddr() net.Addr {
 	return &net.TCPAddr{
 		IP: c.remoteIP,
 	}
+}
+
+func TestForwardWriteError(t *testing.T) {
+	var wg sync.WaitGroup
+	wg.Add(1)
+	forward(&wg, &mockedConnReadOkay{}, &mockedConnWriteError{})
+}
+
+type mockedConnReadOkay struct {
+	net.Conn
+	localIP  net.IP
+	remoteIP net.IP
+}
+
+func (c *mockedConnReadOkay) Read(b []byte) (int, error) {
+	return len(b), nil
 }
