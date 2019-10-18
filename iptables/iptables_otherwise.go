@@ -1,12 +1,30 @@
 // +build !linux
 
-// Package iptables contains code for managing iptables rules
 package iptables
 
-// Start installs iptables rules
-func Start() {
+import "errors"
+
+type otherwiseShell struct{}
+
+func (*otherwiseShell) dropIfDestinationEquals(ip string) error {
+	return errors.New("not implemented")
+}
+func (*otherwiseShell) rstIfDestinationEqualsAndIsTCP(ip string) error {
+	return errors.New("not implemented")
+}
+func (*otherwiseShell) dropIfContainsKeyword(keyword string) error {
+	return errors.New("not implemented")
+}
+func (*otherwiseShell) rstIfContainsKeywordAndIsTCP(keyword string) error {
+	return errors.New("not implemented")
+}
+func (*otherwiseShell) hijackDNS(address string) error {
+	return errors.New("not implemented")
+}
+func (*otherwiseShell) waive() error {
+	return errors.New("not implemented")
 }
 
-// Stop removes iptables rules
-func Stop() {
+func newShell() *otherwiseShell {
+	return &otherwiseShell{}
 }

@@ -30,6 +30,12 @@ var (
 	httpProxyDNSAddress   *string
 	httpProxyDNSTransport *string
 
+	iptablesDropIP       flagx.StringArray
+	iptablesDropKeyword  flagx.StringArray
+	iptablesHijackDNSTo  *string
+	iptablesResetIP      flagx.StringArray
+	iptablesResetKeyword flagx.StringArray
+
 	tlsProxyAddress      *string
 	tlsProxyBlock        flagx.StringArray
 	tlsProxyDNSAddress   *string
@@ -77,6 +83,28 @@ func init() {
 		"Transport to be used with the upstream DNS",
 	)
 
+	// iptablesProxy
+	flag.Var(
+		&iptablesDropIP, "iptables-drop-ip",
+		"Drop traffic to the specified IP address",
+	)
+	flag.Var(
+		&iptablesDropKeyword, "iptables-drop-keyword",
+		"Drop traffic containing the specified keyword",
+	)
+	iptablesHijackDNSTo = flag.String(
+		"iptables-hijack-dns-to", "",
+		"Hijack all DNS UDP traffic to the specified endpoint",
+	)
+	flag.Var(
+		&iptablesResetIP, "iptables-reset-ip",
+		"Reset TCP/IP traffic to the specified IP address",
+	)
+	flag.Var(
+		&iptablesResetKeyword, "iptables-reset-keyword",
+		"Reset TCP/IP traffic containing the specified keyword",
+	)
+
 	// tlsProxy
 	tlsProxyAddress = flag.String(
 		"tls-proxy-address", "127.0.0.1:443",
@@ -117,6 +145,16 @@ func httpProxyStart() *http.Server {
 	return server
 }
 
+func iptablesStart() *iptables.CensoringPolicy {
+	policy := iptables.NewCensoringPolicy()
+	policy.DropIPs = iptablesDropIP
+	policy.DropKeywords = iptablesDropKeyword
+	policy.HijackDNSAddress = *iptablesHijackDNSTo
+	policy.ResetIPs = iptablesResetIP
+	policy.ResetKeywords = iptablesResetKeyword
+	return policy
+}
+
 func tlsProxyStart() net.Listener {
 	proxy, err := tlsproxy.NewCensoringProxy(
 		tlsProxyBlock, *tlsProxyDNSTransport, *tlsProxyDNSAddress,
@@ -131,8 +169,8 @@ func main() {
 	flag.Parse()
 	dnsProxyStart()
 	httpProxyStart()
-	go iptables.Start()
-	defer iptables.Stop()
+	policy := iptablesStart()
+	defer policy.Waive()
 	tlsProxyStart()
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, os.Interrupt)
