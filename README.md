@@ -23,10 +23,8 @@ With Linux Alpine edge, you can compile Jafar with:
 ## Running
 
 You need to run Jafar as root. You can get a complete list
-of all flags using `./jafar -help`. Read on for more detailed help.
-
-
-Jafar is composed of modules. Each modules is controllable via flags.
+of all flags using `./jafar -help`. Jafar is composed of modules. Each
+module is controllable via flags.
 
 ### iptables
 
