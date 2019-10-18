@@ -35,15 +35,15 @@ The iptables module is only available on Linux. It exports these flags:
 
 ```
   -iptables-drop-ip value
-    	Drop traffic to the specified IP address
+        Drop traffic to the specified IP address
   -iptables-drop-keyword value
-    	Drop traffic containing the specified keyword
+        Drop traffic containing the specified keyword
   -iptables-hijack-dns-to string
-    	Hijack all DNS UDP traffic to the specified endpoint
+        Hijack all DNS UDP traffic to the specified endpoint
   -iptables-reset-ip value
-    	Reset TCP/IP traffic to the specified IP address
+        Reset TCP/IP traffic to the specified IP address
   -iptables-reset-keyword value
-    	Reset TCP/IP traffic containing the specified keyword
+        Reset TCP/IP traffic containing the specified keyword
 ```
 
 The difference between `drop` and `reset` is that in the former case
@@ -69,15 +69,15 @@ hijacking, you will need to configure your application explicitly.
 
 ```
   -dns-proxy-address string
-    	Address where the DNS proxy should listen (default "127.0.0.1:53")
+        Address where the DNS proxy should listen (default "127.0.0.1:53")
   -dns-proxy-block value
-    	Register keyword triggering NXDOMAIN censorship
+        Register keyword triggering NXDOMAIN censorship
   -dns-proxy-dns-address string
-    	Address of the upstream DNS to be used by the proxy (default "1.1.1.1:853")
+        Address of the upstream DNS to be used by the proxy (default "1.1.1.1:853")
   -dns-proxy-dns-transport string
-    	Transport to be used with the upstream DNS (default "dot")
+        Transport to be used with the upstream DNS (default "dot")
   -dns-proxy-hijack value
-    	Register keyword triggering redirection to 127.0.0.1
+        Register keyword triggering redirection to 127.0.0.1
 ```
 
 The `-dns-proxy-address` flag controls the endpoint where the proxy is
@@ -105,13 +105,13 @@ specific requests. It's controlled by these flags:
 
 ```
   -http-proxy-address string
-    	Address where the HTTP proxy should listen (default "127.0.0.1:80")
+        Address where the HTTP proxy should listen (default "127.0.0.1:80")
   -http-proxy-block value
-    	Register keyword triggering HTTP 541 censorship
+        Register keyword triggering HTTP 541 censorship
   -http-proxy-dns-address string
-    	Address of the upstream DNS to be used by the proxy (default "1.1.1.1:853")
+        Address of the upstream DNS to be used by the proxy (default "1.1.1.1:853")
   -http-proxy-dns-transport string
-    	Transport to be used with the upstream DNS (default "dot")
+        Transport to be used with the upstream DNS (default "dot")
 ```
 
 The `-http-proxy-address` and `-http-proxy-dns-{address,transport}` flags
@@ -131,13 +131,13 @@ on their SNI value. It is controlled by the following flags:
 
 ```
   -tls-proxy-address string
-    	Address where the HTTP proxy should listen (default "127.0.0.1:443")
+        Address where the HTTP proxy should listen (default "127.0.0.1:443")
   -tls-proxy-block value
-    	Register keyword triggering TLS censorship
+        Register keyword triggering TLS censorship
   -tls-proxy-dns-address string
-    	Address of the upstream DNS to be used by the proxy (default "1.1.1.1:853")
+        Address of the upstream DNS to be used by the proxy (default "1.1.1.1:853")
   -tls-proxy-dns-transport string
-    	Transport to be used with the upstream DNS (default "dot")
+        Transport to be used with the upstream DNS (default "dot")
 ```
 
 The `-tls-proxy-address` and `-tls-proxy-dns-{address,transport}` flags
@@ -165,6 +165,8 @@ Force all traffic through the HTTP and TLS proxy and use them to censor
 
 ```
 # ./jafar -iptables-hijack-dns-to 127.0.0.1:5353 \
+          -dns-proxy-address 127.0.0.1:5353      \
+          -dns-proxy-hijack play.google.com      \
           -http-proxy-block play.google.com      \
           -tls-proxy-block play.google.com
 ```
