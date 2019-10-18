@@ -107,7 +107,7 @@ func TestIntegrationListenError(t *testing.T) {
 
 func newproxy(t *testing.T, blocked string) net.Listener {
 	proxy, err := NewCensoringProxy(
-		[]string{blocked}, "dot", "1.1.1.1:853",
+		[]string{blocked}, "system", "",
 	)
 	if err != nil {
 		t.Fatal(err)
