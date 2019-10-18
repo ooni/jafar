@@ -2,10 +2,12 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"net"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/m-lab/go/flagx"
 	"github.com/m-lab/go/rtx"
@@ -34,8 +36,7 @@ var (
 	iptablesResetIP      flagx.StringArray
 	iptablesResetKeyword flagx.StringArray
 
-	mainCtx    context.Context
-	mainCancel context.CancelFunc
+	mainCh chan os.Signal
 
 	tlsProxyAddress      *string
 	tlsProxyBlock        flagx.StringArray
@@ -107,7 +108,10 @@ func init() {
 	)
 
 	// main
-	mainCtx, mainCancel = context.WithCancel(context.Background())
+	mainCh = make(chan os.Signal, 1)
+	signal.Notify(
+		mainCh, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT,
+	)
 
 	// tlsProxy
 	tlsProxyAddress = flag.String(
@@ -171,17 +175,12 @@ func tlsProxyStart() net.Listener {
 	return listener
 }
 
-func mainWithContext(ctx context.Context) {
+func main() {
+	flag.Parse()
 	dnsProxyStart()
 	httpProxyStart()
 	policy := iptablesStart()
 	defer policy.Waive()
 	tlsProxyStart()
-	<-ctx.Done()
-}
-
-func main() {
-	flag.Parse()
-	defer mainCancel()
-	mainWithContext(mainCtx)
+	<-mainCh
 }
