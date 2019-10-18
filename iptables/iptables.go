@@ -12,8 +12,12 @@ import (
 )
 
 var (
-	drop  flagx.StringArray
-	reset flagx.StringArray
+	drop       flagx.StringArray
+	reset      flagx.StringArray
+	routeDNSTo = flag.String(
+		"iptables-route-dns-to", "127.0.0.1:53",
+		"Route all DNS traffic to a specific address",
+	)
 )
 
 func init() {
@@ -62,9 +66,16 @@ func Start() {
 			)
 		}
 	}
+	if *routeDNSTo != "" {
+		mustExec(
+			"iptables", "-t", "nat", "-A", "OUTPUT", "-p", "udp", "--dport", "53",
+			"-m", "owner", "!", "--uid-owner", "0", "-j", "DNAT", "--to", *routeDNSTo,
+		)
+	}
 }
 
 // Stop removes iptables rules
 func Stop() {
 	mustExec("iptables", "--flush")
+	mustExec("iptables", "--flush", "--table", "nat")
 }

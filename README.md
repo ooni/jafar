@@ -24,8 +24,12 @@ This module use iptables rules to drop or reject packets. The
 the argument is an `ip`, then packets having that IP as destination
 are dropped. Otherwise, we drop packets containing `<string>`.
 
-The `iptables-rst <value>` rule is similar except that it sends a RST
+The `-iptables-rst <value>` flag is similar except that it sends a RST
 segment to forcibly terminate a specifc flow.
+
+The `-iptables-route-dns-to <address>` flag is active by default and
+redirects any DNS traffic not run by root to the resolver model, so that
+we can have a chance of applying censorship policies.
 
 ## module: resolver
 
