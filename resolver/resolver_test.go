@@ -74,7 +74,7 @@ func newresolver(t *testing.T, blocked, hijacked string) *dns.Server {
 		[]string{blocked}, []string{hijacked},
 		// using faster dns because dot here causes miekg/dns's
 		// dns.Exchange to timeout and I don't want more complexity
-		"udp", "1.1.1.1:53",
+		"system", "",
 	)
 	if err != nil {
 		t.Fatal(err)
