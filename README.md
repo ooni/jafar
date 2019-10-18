@@ -6,58 +6,153 @@
 Jafar is a censorship simulation tool. Some of its functionality are more
 easily coupled with github.com/ooni/netx.
 
-We use Go >= 1.11. With:
+## Building
+
+We use Go >= 1.11. Jafar also needs the C library headers,
+iptables installed, and root permissions.
+
+With Linux Alpine edge, you can compile Jafar with:
 
 ```
-go build -v .
+# apk add go git musl-dev iptables
+# go build -v .
 ```
 
-you compile Jafar. You need to run Jafar as root. You can get a complete list
+## Running
+
+You need to run Jafar as root. You can get a complete list
 of all flags using `./jafar -help`. Read on for more detailed help.
+
 
 Jafar is composed of modules. Each modules is controllable via flags.
 
-## module: iptables
+### iptables
 
-This module use iptables rules to drop or reject packets. The
-`-iptables-drop <ip|string>` flag adds a rule that drops packets. If
-the argument is an `ip`, then packets having that IP as destination
-are dropped. Otherwise, we drop packets containing `<string>`.
+The iptables module is only available on Linux. It exports these flags:
 
-The `-iptables-rst <value>` flag is similar except that it sends a RST
-segment to forcibly terminate a specifc flow.
+```
+  -iptables-drop-ip value
+    	Drop traffic to the specified IP address
+  -iptables-drop-keyword value
+    	Drop traffic containing the specified keyword
+  -iptables-hijack-dns-to string
+    	Hijack all DNS UDP traffic to the specified endpoint
+  -iptables-reset-ip value
+    	Reset TCP/IP traffic to the specified IP address
+  -iptables-reset-keyword value
+    	Reset TCP/IP traffic containing the specified keyword
+```
 
-The `-iptables-route-dns-to <address>` flag is active by default and
-redirects any DNS traffic not run by root to the resolver model, so that
-we can have a chance of applying censorship policies.
+The difference between `drop` and `reset` is that in the former case
+a packet is dropped, in the latter case a RST is sent.
 
-## module: resolver
+The difference between `ip` and `keyword` flags is that the former
+match an outgonig IP, the latter uses DPI.
 
-This module is a stub resolver. You should configure it as your
-resolver on your system to simulate censorship.
+The `drop` and `reset` rules allow you to simulate, respectively, when
+operations timeout and when a connection cannot be established (with
+`reset` and `ip`) or is reset after a keyword is seen (with `keyword`).
 
-By default, the resolver listens on `127.0.0.1:53` and you can use the
-`-resolver-address <address>` flag to change that. It will forward
-all queries to the configured DNS upstream (`8.8.8.8:53` by default,
-use the `-resolver-upstream` to change that).
+Hijacking DNS traffic is useful, for example, to redirect all DNS UDP
+traffic from the box to the `dns-proxy` module.
 
-The `-resolver-hijack <value>` flag adds a rule such that the
-resolver returns `127.0.0.1` for queries containing `<value>`, thus
-directing traffic to `httpproxy` and `tlsproxy`.
+### dns-proxy (aka resolver)
 
-The `-resolver-block <value>` is like above but returns `NXDOMAIN`.
+The DNS proxy or resolver allows to manipulate DNS. Unless you use DNS
+hijacking, you will need to configure your application explicitly.
 
-## module: httpproxy
+```
+  -dns-proxy-address string
+    	Address where the DNS proxy should listen (default "127.0.0.1:53")
+  -dns-proxy-block value
+    	Register keyword triggering NXDOMAIN censorship
+  -dns-proxy-dns-address string
+    	Address of the upstream DNS to be used by the proxy (default "1.1.1.1:853")
+  -dns-proxy-dns-transport string
+    	Transport to be used with the upstream DNS (default "dot")
+  -dns-proxy-hijack value
+    	Register keyword triggering redirection to 127.0.0.1
+```
 
-When you use DNS-injection-based hijacking (see above) you are redirected
-to `127.0.0.1`. The httpproxy module is here for taking care of these
-redirected requests. If you used any `-httpproxy-block <value>`, we
-will return `451` if the `Host` header contains `<value>`. Otherwise,
-we'll use the `Host` header to issue a request and return you the
-corresponding HTTP response. We listen on `127.0.0.1:80` by default
-and you can use `-httpproxy-address <address>` to change that.
+The `-dns-proxy-address` flag controls the endpoint where the proxy is
+listening. The `-dns-proxy-dns-{address,transport}` flags allow to choose
+a different upstream DNS with transports like `dot` and `doh`. Remember
+to avoid using the `udp` transport if you're also using DNS hijacking since
+these two settings will probably clash. See github.com/ooni/netx and in
+particular the documentation of ConfigureDNS for more information concerning
+the different transports that you can use.
 
-## module: tlsproxy
+The `-dns-proxy-block` tells the resolver that every incoming request whose
+query contains the specifed string shall receive an `NXDOMAIN` reply.
 
-This module is like `httpproxy` except that it uses SNI to find
-out what server to connect to, rather than the `Host` header.
+The `-dns-proxy-hijack` is similar but instead lies and returns to the
+client that the requested domain is at `127.0.0.1`. This is an opportunity
+to redirect traffic to the HTTP and TLS proxies.
+
+### http-proxy
+
+The HTTP proxy is an HTTP proxy that may refuse to forward some
+specific requests. It's controlled by these flags:
+
+```
+  -http-proxy-address string
+    	Address where the HTTP proxy should listen (default "127.0.0.1:80")
+  -http-proxy-block value
+    	Register keyword triggering HTTP 541 censorship
+  -http-proxy-dns-address string
+    	Address of the upstream DNS to be used by the proxy (default "1.1.1.1:853")
+  -http-proxy-dns-transport string
+    	Transport to be used with the upstream DNS (default "dot")
+```
+
+The `-http-proxy-address` and `-http-proxy-dns-{address,transport}` flags
+have the same semantics they have for the DNS proxy, and they also have the
+same caveats regarding mixing DNS hijacking and `udp` transports.
+
+The `-http-proxy-block` flag tells the proxy that it should return a `451`
+response for every request whose `Host` contains the specified string.
+
+### tls-proxy
+
+TLS proxy is a proxy that routes traffic to specific servers depending
+on their SNI value. It is controlled by the following flags:
+
+```
+  -tls-proxy-address string
+    	Address where the HTTP proxy should listen (default "127.0.0.1:443")
+  -tls-proxy-block value
+    	Register keyword triggering TLS censorship
+  -tls-proxy-dns-address string
+    	Address of the upstream DNS to be used by the proxy (default "1.1.1.1:853")
+  -tls-proxy-dns-transport string
+    	Transport to be used with the upstream DNS (default "dot")
+```
+
+The `-tls-proxy-address` and `-tls-proxy-dns-{address,transport}` flags
+have the same semantics they have for the DNS proxy, and they also have the
+same caveats regarding mixing DNS hijacking and `udp` transports.
+
+The `-tls-proxy-block` specifies which string or strings should cause the
+proxy to return an internal-erorr alert when the incoming ClientHello's SNI
+contains one of the strings provided with this option.
+
+## Examples
+
+Block `play.google.com` with RST injection, force DNS traffic to use the our
+DNS proxy, and force it to censor `play.google.com` with `NXDOMAIN`.
+
+```
+# ./jafar -iptables-reset-keyword play.google.com \
+          -iptables-hijack-dns-to 127.0.0.1:5353  \
+          -dns-proxy-address 127.0.0.1:5353       \
+          -dns-proxy-block play.google.com
+```
+
+Force all traffic through the HTTP and TLS proxy and use them to censor
+`play.google.com` using HTTP 451 and responding with TLS alerts:
+
+```
+# ./jafar -iptables-hijack-dns-to 127.0.0.1:5353 \
+          -http-proxy-block play.google.com      \
+          -tls-proxy-block play.google.com
+```
