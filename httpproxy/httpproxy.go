@@ -3,12 +3,11 @@ package httpproxy
 
 import (
 	"flag"
-	"io/ioutil"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"strings"
 
-	"github.com/apex/log"
 	"github.com/m-lab/go/flagx"
 	"github.com/m-lab/go/rtx"
 	"github.com/ooni/netx/handlers"
@@ -46,34 +45,12 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	r.Header.Add("Via", "jafar/0.1.0")
-	resp, err := client.HTTPClient.Do(&http.Request{
-		Body:   r.Body,
-		Header: r.Header,
-		Method: r.Method,
-		URL: &url.URL{
-			Host:   r.Host,
-			Path:   r.RequestURI,
-			Scheme: "http",
-		},
+	proxy := httputil.NewSingleHostReverseProxy(&url.URL{
+		Host:   r.Host,
+		Scheme: "http",
 	})
-	if err != nil {
-		log.WithError(err).Warn("http.DefaultClient.Do failed")
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	defer resp.Body.Close()
-	for key, values := range resp.Header {
-		w.Header()[key] = values
-	}
-	data, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.WithError(err).Warn("ioutil.ReadAll failed")
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	w.WriteHeader(resp.StatusCode)
-	w.Write(data)
+	proxy.Transport = client.Transport
+	proxy.ServeHTTP(w, r)
 }
 
 // Start starts the HTTP transparent proxy.
