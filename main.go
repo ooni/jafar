@@ -152,6 +152,8 @@ func iptablesStart() *iptables.CensoringPolicy {
 	policy.HijackDNSAddress = *iptablesHijackDNSTo
 	policy.ResetIPs = iptablesResetIP
 	policy.ResetKeywords = iptablesResetKeyword
+	err := policy.Apply()
+	rtx.Must(err, "policy.Apply failed")
 	return policy
 }
 
