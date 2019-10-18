@@ -1,123 +1,126 @@
-// Package resolver contains the DNS proxy
+// Package resolver contains the DNS resolver
 package resolver
 
 import (
-	"flag"
+	"context"
 	"net"
 	"strings"
-	"time"
 
-	"github.com/apex/log"
-	"github.com/m-lab/go/flagx"
-	"github.com/m-lab/go/rtx"
 	"github.com/miekg/dns"
+	"github.com/ooni/netx"
+	"github.com/ooni/netx/handlers"
 )
 
-var (
-	address = flag.String(
-		"resolver-address", "127.0.0.1:53",
-		"Address where this stub DNS resolver should listen",
-	)
-	blocked  flagx.StringArray
-	hijacked flagx.StringArray
-	upstream = flag.String(
-		"resolver-upstream", "8.8.8.8:53",
-		"Upstream DNS resolver to be used by the this resolver",
-	)
-)
-
-func init() {
-	flag.Var(
-		&blocked, "resolver-block",
-		"Censor with NXDOMAIN queries received by resolver containing <value>",
-	)
-	flag.Var(
-		&hijacked, "resolver-hijack",
-		"Return 127.0.0.1 for queries received by resolver containing <value>",
-	)
+// CensoringResolver is a censoring resolver.
+type CensoringResolver struct {
+	blocked, hijacked []string
+	lookupHost        func(ctx context.Context, host string) ([]string, error)
 }
 
-func roundtrip(w dns.ResponseWriter, r *dns.Msg) error {
-	conn, err := net.Dial("udp", *upstream)
+// NewCensoringResolver creates a new CensoringResolver instance using
+// the specified list of keywords to censor. blocked is the list of
+// keywords that trigger NXDOMAIN if they appear in a query. hijacked
+// is similar but redirects to 127.0.0.1, where the transparent HTTP
+// and TLS proxies will pick them up. dnsNetwork and dnsAddress are the
+// settings to configure the upstream, non censored DNS.
+func NewCensoringResolver(
+	blocked, hijacked []string, dnsNetwork, dnsAddress string,
+) (*CensoringResolver, error) {
+	dialer := netx.NewDialer(handlers.StdoutHandler)
+	resolver, err := dialer.NewResolver(dnsNetwork, dnsAddress)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer conn.Close()
-	if err := conn.SetDeadline(time.Now().Add(time.Second)); err != nil {
-		return err
-	}
-	data, err := r.Pack()
-	if err != nil {
-		return err
-	}
-	if _, err := conn.Write(data); err != nil {
-		return err
-	}
-	data = make([]byte, 4096)
-	count, err := conn.Read(data)
-	if err != nil {
-		return err
-	}
-	m := new(dns.Msg)
-	if err = m.Unpack(data[:count]); err != nil {
-		return err
-	}
-	w.WriteMsg(m)
-	return nil
+	return &CensoringResolver{
+		blocked:    blocked,
+		hijacked:   hijacked,
+		lookupHost: resolver.LookupHost,
+	}, nil
 }
 
-func meddletrip(w dns.ResponseWriter, r *dns.Msg, redirectTo net.IP) {
-	log.Infof("meddletrip: %s %+v", r.Question[0].Name, redirectTo)
+func (r *CensoringResolver) roundtrip(rw dns.ResponseWriter, req *dns.Msg) {
+	name := req.Question[0].Name
+	addrs, err := r.lookupHost(context.Background(), name)
+	var ips []net.IP
+	if err == nil {
+		for _, addr := range addrs {
+			if ip := net.ParseIP(addr); ip != nil {
+				ips = append(ips, ip)
+			}
+		}
+	}
+	r.reply(rw, req, ips)
+}
+
+func (r *CensoringResolver) reply(
+	rw dns.ResponseWriter, req *dns.Msg, ips []net.IP,
+) {
 	m := new(dns.Msg)
 	m.Compress = true
 	m.MsgHdr.RecursionAvailable = true
-	m.SetReply(r)
-	if redirectTo != nil {
-		switch r.Question[0].Qtype {
-		case dns.TypeA:
+	m.SetReply(req)
+	for _, ip := range ips {
+		ipv6 := strings.Contains(ip.String(), ":")
+		if !ipv6 && req.Question[0].Qtype == dns.TypeA {
 			m.Answer = append(m.Answer, &dns.A{
 				Hdr: dns.RR_Header{
-					Name:   r.Question[0].Name,
+					Name:   req.Question[0].Name,
 					Rrtype: dns.TypeA,
 					Class:  dns.ClassINET,
 					Ttl:    0,
 				},
-				A: redirectTo,
+				A: ip,
 			})
 		}
-	} else {
-		m.SetRcode(r, dns.RcodeNameError)
 	}
-	w.WriteMsg(m)
+	if m.Answer == nil {
+		m.SetRcode(req, dns.RcodeNameError)
+	}
+	rw.WriteMsg(m)
 }
 
-func handle(w dns.ResponseWriter, r *dns.Msg) {
-	name := r.Question[0].Name
-	for _, pattern := range blocked {
+func (r *CensoringResolver) failure(rw dns.ResponseWriter, req *dns.Msg) {
+	m := new(dns.Msg)
+	m.Compress = true
+	m.MsgHdr.RecursionAvailable = true
+	m.SetRcode(req, dns.RcodeServerFailure)
+	rw.WriteMsg(m)
+}
+
+// ServeDNS serves a DNS request
+func (r *CensoringResolver) ServeDNS(rw dns.ResponseWriter, req *dns.Msg) {
+	if len(req.Question) < 1 {
+		r.failure(rw, req)
+		return
+	}
+	name := req.Question[0].Name
+	for _, pattern := range r.blocked {
 		if strings.Contains(name, pattern) {
-			meddletrip(w, r, nil)
+			r.reply(rw, req, nil)
 			return
 		}
 	}
-	for _, pattern := range hijacked {
+	for _, pattern := range r.hijacked {
 		if strings.Contains(name, pattern) {
-			meddletrip(w, r, net.IPv4(127, 0, 0, 1))
+			r.reply(rw, req, []net.IP{net.IPv4(127, 0, 0, 1)})
 			return
 		}
 	}
-	if err := roundtrip(w, r); err != nil {
-		m := new(dns.Msg)
-		m.Compress = true
-		m.MsgHdr.RecursionAvailable = true
-		m.SetRcode(r, dns.RcodeServerFailure)
-		w.WriteMsg(m)
-	}
+	r.roundtrip(rw, req)
 }
 
-// Start starts the DNS proxy
-func Start() {
-	dns.HandleFunc(".", handle)
-	server := &dns.Server{Addr: *address, Net: "udp"}
-	err := server.ListenAndServe()
-	rtx.Must(err, "dnsListenAndServe failed")
+// Start starts the DNS resolver
+func (r *CensoringResolver) Start(address string) (*dns.Server, error) {
+	packetconn, err := net.ListenPacket("udp", address)
+	if err != nil {
+		return nil, err
+	}
+	server := &dns.Server{
+		Addr:       address,
+		Handler:    r,
+		Net:        "udp",
+		PacketConn: packetconn,
+	}
+	go server.ActivateAndServe()
+	return server, nil
 }
