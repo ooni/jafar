@@ -1,3 +1,5 @@
+// +build linux
+
 // Package iptables contains code for managing iptables rules
 package iptables
 
