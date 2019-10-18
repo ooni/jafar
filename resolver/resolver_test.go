@@ -72,7 +72,9 @@ func TestListenFailure(t *testing.T) {
 func newresolver(t *testing.T, blocked, hijacked string) *dns.Server {
 	resolver, err := NewCensoringResolver(
 		[]string{blocked}, []string{hijacked},
-		"dot", "1.1.1.1:853",
+		// using faster dns because dot here causes miekg/dns's
+		// dns.Exchange to timeout and I don't want more complexity
+		"udp", "1.1.1.1:53",
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -102,42 +104,54 @@ func checkrequest(
 	}
 	switch expectStatus {
 	case "success":
-		if reply.Rcode != dns.RcodeSuccess {
-			t.Fatal("unexpected rcode")
-		}
-		if len(reply.Answer) < 1 {
-			t.Fatal("too few answers")
-		}
-		for _, answer := range reply.Answer {
-			if rr, ok := answer.(*dns.A); ok {
-				if rr.A.String() == "127.0.0.1" {
-					t.Fatal("unexpected hijacked response here")
-				}
-			}
-		}
+		checksuccess(t, reply)
 	case "hijacked":
-		if reply.Rcode != dns.RcodeSuccess {
-			t.Fatal("unexpected rcode")
-		}
-		if len(reply.Answer) < 1 {
-			t.Fatal("too few answers")
-		}
-		for _, answer := range reply.Answer {
-			if rr, ok := answer.(*dns.A); ok {
-				if rr.A.String() != "127.0.0.1" {
-					t.Fatal("unexpected non-hijacked response here")
-				}
-			}
-		}
+		checkhijacked(t, reply)
 	case "blocked":
-		if reply.Rcode != dns.RcodeNameError {
-			t.Fatal("unexpected rcode")
-		}
-		if len(reply.Answer) >= 1 {
-			t.Fatal("too many answers")
-		}
+		checkblocked(t, reply)
 	default:
 		panic("unexpected value")
+	}
+}
+
+func checksuccess(t *testing.T, reply *dns.Msg) {
+	if reply.Rcode != dns.RcodeSuccess {
+		t.Fatal("unexpected rcode")
+	}
+	if len(reply.Answer) < 1 {
+		t.Fatal("too few answers")
+	}
+	for _, answer := range reply.Answer {
+		if rr, ok := answer.(*dns.A); ok {
+			if rr.A.String() == "127.0.0.1" {
+				t.Fatal("unexpected hijacked response here")
+			}
+		}
+	}
+}
+
+func checkhijacked(t *testing.T, reply *dns.Msg) {
+	if reply.Rcode != dns.RcodeSuccess {
+		t.Fatal("unexpected rcode")
+	}
+	if len(reply.Answer) < 1 {
+		t.Fatal("too few answers")
+	}
+	for _, answer := range reply.Answer {
+		if rr, ok := answer.(*dns.A); ok {
+			if rr.A.String() != "127.0.0.1" {
+				t.Fatal("unexpected non-hijacked response here")
+			}
+		}
+	}
+}
+
+func checkblocked(t *testing.T, reply *dns.Msg) {
+	if reply.Rcode != dns.RcodeNameError {
+		t.Fatal("unexpected rcode")
+	}
+	if len(reply.Answer) >= 1 {
+		t.Fatal("too many answers")
 	}
 }
 

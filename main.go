@@ -1,4 +1,4 @@
-// jafar is the grand vizier of censorship simulation. 
+// jafar is the grand vizier of censorship simulation.
 package main
 
 import (
