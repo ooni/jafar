@@ -1,5 +1,4 @@
-// jafar is a censorship simulator. We used to have an evilgenius doing
-// that but now we're resorting to an even more evil grand viezir.
+// jafar is the grand vizier of censorship simulation. 
 package main
 
 import (

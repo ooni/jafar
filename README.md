@@ -3,6 +3,8 @@
 > We stepped up the game of simulating censorship upgrading from the
 > evil genius to the evil grand vizier.
 
+[![Build Status](https://travis-ci.org/ooni/jafar.svg?branch=master)](https://travis-ci.org/ooni/jafar) [![Coverage Status](https://coveralls.io/repos/github/ooni/jafar/badge.svg?branch=master)](https://coveralls.io/github/ooni/jafar?branch=master) [![Go Report Card](https://goreportcard.com/badge/github.com/ooni/jafar)](https://goreportcard.com/report/github.com/ooni/jafar)
+
 Jafar is a censorship simulation tool. Some of its functionality are more
 easily coupled with github.com/ooni/netx.
 
@@ -27,6 +29,9 @@ of all flags using `./jafar -help`. Read on for more detailed help.
 Jafar is composed of modules. Each modules is controllable via flags.
 
 ### iptables
+
+[![GoDoc](https://godoc.org/github.com/ooni/jafar/iptables?status.svg)](
+https://godoc.org/github.com/ooni/jafar/iptables)
 
 The iptables module is only available on Linux. It exports these flags:
 
@@ -57,6 +62,9 @@ Hijacking DNS traffic is useful, for example, to redirect all DNS UDP
 traffic from the box to the `dns-proxy` module.
 
 ### dns-proxy (aka resolver)
+
+[![GoDoc](https://godoc.org/github.com/ooni/jafar/resolver?status.svg)](
+https://godoc.org/github.com/ooni/jafar/resolver)
 
 The DNS proxy or resolver allows to manipulate DNS. Unless you use DNS
 hijacking, you will need to configure your application explicitly.
@@ -91,6 +99,9 @@ to redirect traffic to the HTTP and TLS proxies.
 
 ### http-proxy
 
+[![GoDoc](https://godoc.org/github.com/ooni/jafar/httpproxy?status.svg)](
+https://godoc.org/github.com/ooni/jafar/httpproxy)
+
 The HTTP proxy is an HTTP proxy that may refuse to forward some
 specific requests. It's controlled by these flags:
 
@@ -113,6 +124,9 @@ The `-http-proxy-block` flag tells the proxy that it should return a `451`
 response for every request whose `Host` contains the specified string.
 
 ### tls-proxy
+
+[![GoDoc](https://godoc.org/github.com/ooni/jafar/tlsproxy?status.svg)](
+https://godoc.org/github.com/ooni/jafar/tlsproxy)
 
 TLS proxy is a proxy that routes traffic to specific servers depending
 on their SNI value. It is controlled by the following flags:
