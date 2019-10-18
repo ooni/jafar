@@ -37,13 +37,11 @@ By default, the resolver listens on `127.0.0.1:53` and you can use the
 all queries to the configured DNS upstream (`8.8.8.8:53` by default,
 use the `-resolver-upstream` to change that).
 
-The `-resolver-blackhole <value>` flag adds a rule such that the
-resolver returns `127.0.0.2` for queries containing `<value>`.
+The `-resolver-hijack <value>` flag adds a rule such that the
+resolver returns `127.0.0.1` for queries containing `<value>`, thus
+directing traffic to `httpproxy` and `tlsproxy`.
 
 The `-resolver-block <value>` is like above but returns `NXDOMAIN`.
-
-The `-resolver-hijack <value>` is like above but redirects on
-`127.0.0.1` where we have `httpproxy` and `tlsproxy`.
 
 ## module: httpproxy
 

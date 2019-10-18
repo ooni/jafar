@@ -4,7 +4,6 @@ go 1.13
 
 require (
 	github.com/apex/log v1.1.1
-	github.com/google/gopacket v1.1.17
 	github.com/m-lab/go v1.1.0
 	github.com/miekg/dns v1.1.22
 )

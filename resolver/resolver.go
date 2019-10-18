@@ -18,20 +18,15 @@ var (
 		"resolver-address", "127.0.0.1:53",
 		"Address where this stub DNS resolver should listen",
 	)
-	blackholed flagx.StringArray
-	blocked    flagx.StringArray
-	hijacked   flagx.StringArray
-	upstream   = flag.String(
+	blocked  flagx.StringArray
+	hijacked flagx.StringArray
+	upstream = flag.String(
 		"resolver-upstream", "8.8.8.8:53",
 		"Upstream DNS resolver to be used by the this resolver",
 	)
 )
 
 func init() {
-	flag.Var(
-		&blackholed, "resolver-blackhole",
-		"Return 127.0.0.2 for queries received by resolver containing <value>",
-	)
 	flag.Var(
 		&blocked, "resolver-block",
 		"Censor with NXDOMAIN queries received by resolver containing <value>",
@@ -98,12 +93,6 @@ func meddletrip(w dns.ResponseWriter, r *dns.Msg, redirectTo net.IP) {
 
 func handle(w dns.ResponseWriter, r *dns.Msg) {
 	name := r.Question[0].Name
-	for _, pattern := range blackholed {
-		if strings.Contains(name, pattern) {
-			meddletrip(w, r, net.IPv4(127, 0, 0, 2))
-			return
-		}
-	}
 	for _, pattern := range blocked {
 		if strings.Contains(name, pattern) {
 			meddletrip(w, r, nil)
