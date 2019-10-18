@@ -8,7 +8,7 @@ import (
 	"os/signal"
 
 	"github.com/ooni/jafar/httpproxy"
-	"github.com/ooni/jafar/pktinjector"
+	"github.com/ooni/jafar/iptables"
 	"github.com/ooni/jafar/resolver"
 	"github.com/ooni/jafar/tlsproxy"
 )
@@ -16,7 +16,8 @@ import (
 func main() {
 	flag.Parse()
 	go httpproxy.Start()
-	go pktinjector.Start()
+	go iptables.Start()
+	defer iptables.Stop()
 	go resolver.Start()
 	go tlsproxy.Start()
 	ch := make(chan os.Signal, 1)

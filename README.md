@@ -17,16 +17,15 @@ of all flags using `./jafar -help`. Read on for more detailed help.
 
 Jafar is composed of modules. Each modules is controllable via flags.
 
-## module: pktinjector
+## module: iptables
 
-This module sniffs packets on one or more interfaces. Use
-`-pktinjector-interface`, possibly multiple times, to specify
-which interface(s) to use. Otherwise, we'll pick all interfaces
-with an assigned IPv4 different from `127.0.0.1`.
+This module use iptables rules to drop or reject packets. The
+`-iptables-drop <ip|string>` flag adds a rule that drops packets. If
+the argument is an `ip`, then packets having that IP as destination
+are dropped. Otherwise, we drop packets containing `<string>`.
 
-The `-pktinjector-rst <value>` flag adds a rule such that we
-will inject a RST segment whenever we see `<value>` inside an
-outgoing TCP segment query.
+The `iptables-rst <value>` rule is similar except that it sends a RST
+segment to forcibly terminate a specifc flow.
 
 ## module: resolver
 
