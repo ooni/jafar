@@ -4,6 +4,7 @@ package main
 
 import (
 	"flag"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -21,6 +22,10 @@ var (
 	httpProxyBlock        flagx.StringArray
 	httpProxyDNSAddress   *string
 	httpProxyDNSTransport *string
+	tlsProxyAddress       *string
+	tlsProxyBlock         flagx.StringArray
+	tlsProxyDNSAddress    *string
+	tlsProxyDNSTransport  *string
 )
 
 func init() {
@@ -41,6 +46,23 @@ func init() {
 		"http-proxy-dns-transport", "dot",
 		"Transport to be used with the upstream DNS",
 	)
+	// tlsProxy
+	tlsProxyAddress = flag.String(
+		"tls-proxy-address", "127.0.0.1:443",
+		"Address where the HTTP proxy should listen",
+	)
+	flag.Var(
+		&tlsProxyBlock, "tls-proxy-block",
+		"Register keyword triggering TLS censorship",
+	)
+	tlsProxyDNSAddress = flag.String(
+		"tls-proxy-dns-address", "1.1.1.1:853",
+		"Address of the upstream DNS to be used by the proxy",
+	)
+	tlsProxyDNSTransport = flag.String(
+		"tls-proxy-dns-transport", "dot",
+		"Transport to be used with the upstream DNS",
+	)
 }
 
 func httpProxyStart() *http.Server {
@@ -53,13 +75,23 @@ func httpProxyStart() *http.Server {
 	return server
 }
 
+func tlsProxyStart() net.Listener {
+	proxy, err := tlsproxy.NewCensoringProxy(
+		tlsProxyBlock, *tlsProxyDNSTransport, *tlsProxyDNSAddress,
+	)
+	rtx.Must(err, "tls.NewCensoringProxy failed")
+	listener, err := proxy.Start(*tlsProxyAddress)
+	rtx.Must(err, "proxy.Start failed")
+	return listener
+}
+
 func main() {
 	flag.Parse()
 	httpProxyStart()
 	go iptables.Start()
 	defer iptables.Stop()
 	go resolver.Start()
-	go tlsproxy.Start()
+	tlsProxyStart()
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, os.Interrupt)
 	<-ch

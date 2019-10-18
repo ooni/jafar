@@ -4,31 +4,35 @@ package tlsproxy
 import (
 	"crypto/tls"
 	"errors"
-	"flag"
 	"net"
 	"strings"
 	"sync"
 
 	"github.com/apex/log"
-	"github.com/m-lab/go/flagx"
-	"github.com/m-lab/go/rtx"
 	"github.com/ooni/netx"
 	"github.com/ooni/netx/handlers"
 )
 
-var (
-	address = flag.String(
-		"tlsproxy-address", "127.0.0.1:443",
-		"Address where the TLS transparent proxy should listen",
-	)
-	blocked flagx.StringArray
-)
+// CensoringProxy is a censoring TLS proxy
+type CensoringProxy struct {
+	keywords []string
+	dial     func(network, address string) (net.Conn, error)
+}
 
-func init() {
-	flag.Var(
-		&blocked, "tlsproxy-block",
-		"Censor requests via TLS proxy if client hello contains <value>",
-	)
+// NewCensoringProxy creates a new CensoringProxy instance using
+// the specified list of keywords to censor. keywords is the list
+// of keywords that trigger censorship if any of them appears in
+// the SNII record of a ClientHello. dnsNetwork and dnsAddress are
+// settings to configure the upstream, non censored DNS.
+func NewCensoringProxy(
+	keywords []string, dnsNetwork, dnsAddress string,
+) (*CensoringProxy, error) {
+	dialer := netx.NewDialer(handlers.StdoutHandler)
+	proxy := &CensoringProxy{
+		keywords: keywords,
+		dial:     dialer.Dial,
+	}
+	return proxy, dialer.ConfigureDNS(dnsNetwork, dnsAddress)
 }
 
 // handshakeReader is a hack to perform the initial part of the
@@ -54,11 +58,6 @@ func (c *handshakeReader) Write(b []byte) (int, error) {
 	return 0, errors.New("cannot write on this connection")
 }
 
-// Close prevents closing the real connection
-func (c *handshakeReader) Close() error {
-	return nil
-}
-
 // forward forwards left traffic to right
 func forward(wg *sync.WaitGroup, left, right net.Conn) {
 	data := make([]byte, 1<<18)
@@ -74,7 +73,7 @@ func forward(wg *sync.WaitGroup, left, right net.Conn) {
 	wg.Done()
 }
 
-// reset resets the connection
+// reset closes the connection with a RST segment
 func reset(conn net.Conn) {
 	if tc, ok := conn.(*net.TCPConn); ok {
 		tc.SetLinger(0)
@@ -117,8 +116,16 @@ func getsni(conn *handshakeReader) string {
 	return sni
 }
 
+func (p *CensoringProxy) connectingToMyself(conn net.Conn) bool {
+	local := conn.LocalAddr().String()
+	localAddr, _, localErr := net.SplitHostPort(local)
+	remote := conn.RemoteAddr().String()
+	remoteAddr, _, remoteErr := net.SplitHostPort(remote)
+	return localErr != nil || remoteErr != nil || localAddr == remoteAddr
+}
+
 // handle implements the TLS SNI proxy
-func handle(clientconn net.Conn) {
+func (p *CensoringProxy) handle(clientconn net.Conn) {
 	hr := &handshakeReader{Conn: clientconn}
 	sni := getsni(hr)
 	if sni == "" {
@@ -126,18 +133,21 @@ func handle(clientconn net.Conn) {
 		reset(clientconn)
 		return
 	}
-	for _, pattern := range blocked {
+	for _, pattern := range p.keywords {
 		if strings.Contains(sni, pattern) {
 			log.Warnf("tlsproxy: reject SNI by policy: %s", sni)
 			alertclose(clientconn)
 			return
 		}
 	}
-	dialer := netx.NewDialer(handlers.StdoutHandler)
-	dialer.ConfigureDNS("dot", "1.1.1.1:853")
-	serverconn, err := dialer.Dial("tcp", net.JoinHostPort(sni, "443"))
+	serverconn, err := p.dial("tcp", net.JoinHostPort(sni, "443"))
 	if err != nil {
-		log.WithError(err).Warn("tlsproxy: dialer.Dial failed")
+		log.WithError(err).Warn("tlsproxy: p.dial failed")
+		alertclose(clientconn)
+		return
+	}
+	if p.connectingToMyself(serverconn) {
+		log.Warn("tlsproxy: connecting to myself")
 		alertclose(clientconn)
 		return
 	}
@@ -156,20 +166,27 @@ func handle(clientconn net.Conn) {
 	wg.Wait()
 }
 
-func run() {
-	listener, err := net.Listen("tcp", *address)
-	rtx.Must(err, "net.Listen failed")
+func (p *CensoringProxy) run(listener net.Listener) {
 	for {
 		conn, err := listener.Accept()
-		if err != nil {
-			log.WithError(err).Warn("listener.Accept failed")
-			continue
+		if err != nil && strings.Contains(
+			err.Error(), "use of closed network connection") {
+			return
 		}
-		go handle(conn)
+		if err == nil {
+			// It's difficult to make accept fail, so restructure
+			// the code such that we enter into the happy path
+			go p.handle(conn)
+		}
 	}
 }
 
-// Start starts the TLS transparent proxy.
-func Start() {
-	go run()
+// Start starts the censoring proxy.
+func (p *CensoringProxy) Start(address string) (net.Listener, error) {
+	listener, err := net.Listen("tcp", address)
+	if err != nil {
+		return nil, err
+	}
+	go p.run(listener)
+	return listener, nil
 }
