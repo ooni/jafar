@@ -12,6 +12,17 @@ import (
 	"github.com/ooni/jafar/resolver"
 )
 
+func TestCannotApplyPolicy(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("not implemented on this platform")
+	}
+	policy := NewCensoringPolicy()
+	policy.DropIPs = []string{"antani"}
+	if err := policy.Apply(); err == nil {
+		t.Fatal("expected an error here")
+	}
+}
+
 func TestIntegrationDropIP(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("not implemented on this platform")
