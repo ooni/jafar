@@ -3,7 +3,7 @@ dist: xenial
 services:
 - docker
 script:
-- docker build -t jafar-test .
+- docker build -f TestDockerfile -t jafar-test .
 - docker run --privileged -t
     -e TRAVIS_PULL_REQUEST=$TRAVIS_PULL_REQUEST
     -e TRAVIS_JOB_ID=$TRAVIS_JOB_ID
