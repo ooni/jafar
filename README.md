@@ -20,7 +20,14 @@ With Linux Alpine edge, you can compile Jafar with:
 # go build -v .
 ```
 
-## Running
+## Running on Docker
+
+```
+docker build -t jafar-runner .
+docker run -it --privileged -v`pwd`:/jafar -w/jafar jafar-runner
+```
+
+## Usage
 
 You need to run Jafar as root. You can get a complete list
 of all flags using `./jafar -help`. Jafar is composed of modules. Each
