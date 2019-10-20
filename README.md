@@ -20,11 +20,12 @@ With Linux Alpine edge, you can compile Jafar with:
 # go build -v .
 ```
 
-## Running on Docker
+Otherwise, using Docker:
 
 ```
 docker build -t jafar-runner .
 docker run -it --privileged -v`pwd`:/jafar -w/jafar jafar-runner
+go build -v .
 ```
 
 ## Usage
