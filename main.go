@@ -24,6 +24,7 @@ var (
 	dnsProxyDNSAddress   *string
 	dnsProxyDNSTransport *string
 	dnsProxyHijack       flagx.StringArray
+	dnsProxyIgnore       flagx.StringArray
 
 	httpProxyAddress      *string
 	httpProxyBlock        flagx.StringArray
@@ -65,6 +66,10 @@ func init() {
 	flag.Var(
 		&dnsProxyHijack, "dns-proxy-hijack",
 		"Register keyword triggering redirection to 127.0.0.1",
+	)
+	flag.Var(
+		&dnsProxyIgnore, "dns-proxy-ignore",
+		"Register keyword causing the proxy to ignore the query",
 	)
 
 	// httpProxy
@@ -134,7 +139,7 @@ func init() {
 
 func dnsProxyStart() *dns.Server {
 	proxy, err := resolver.NewCensoringResolver(
-		dnsProxyBlock, dnsProxyHijack,
+		dnsProxyBlock, dnsProxyHijack, dnsProxyIgnore,
 		*dnsProxyDNSTransport, *dnsProxyDNSAddress,
 	)
 	rtx.Must(err, "dns.NewCensoringResolver failed")

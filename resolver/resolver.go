@@ -13,8 +13,10 @@ import (
 
 // CensoringResolver is a censoring resolver.
 type CensoringResolver struct {
-	blocked, hijacked []string
-	lookupHost        func(ctx context.Context, host string) ([]string, error)
+	blocked    []string
+	hijacked   []string
+	ignored    []string
+	lookupHost func(ctx context.Context, host string) ([]string, error)
 }
 
 // NewCensoringResolver creates a new CensoringResolver instance using
@@ -24,7 +26,7 @@ type CensoringResolver struct {
 // and TLS proxies will pick them up. dnsNetwork and dnsAddress are the
 // settings to configure the upstream, non censored DNS.
 func NewCensoringResolver(
-	blocked, hijacked []string, dnsNetwork, dnsAddress string,
+	blocked, hijacked, ignored []string, dnsNetwork, dnsAddress string,
 ) (*CensoringResolver, error) {
 	dialer := netx.NewDialer(handlers.StdoutHandler)
 	resolver, err := dialer.NewResolver(dnsNetwork, dnsAddress)
@@ -34,6 +36,7 @@ func NewCensoringResolver(
 	return &CensoringResolver{
 		blocked:    blocked,
 		hijacked:   hijacked,
+		ignored:    ignored,
 		lookupHost: resolver.LookupHost,
 	}, nil
 }
@@ -103,6 +106,11 @@ func (r *CensoringResolver) ServeDNS(rw dns.ResponseWriter, req *dns.Msg) {
 	for _, pattern := range r.hijacked {
 		if strings.Contains(name, pattern) {
 			r.reply(rw, req, []net.IP{net.IPv4(127, 0, 0, 1)})
+			return
+		}
+	}
+	for _, pattern := range r.ignored {
+		if strings.Contains(name, pattern) {
 			return
 		}
 	}

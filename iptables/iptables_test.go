@@ -124,7 +124,7 @@ func TestIntegrationHijackDNS(t *testing.T) {
 		t.Skip("not implemented on this platform")
 	}
 	resolver, err := resolver.NewCensoringResolver(
-		[]string{"ooni.io"}, nil, "dot", "1.1.1.1:853",
+		[]string{"ooni.io"}, nil, nil, "dot", "1.1.1.1:853",
 	)
 	if err != nil {
 		t.Fatal(err)

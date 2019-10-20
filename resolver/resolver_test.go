@@ -1,6 +1,7 @@
 package resolver
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/miekg/dns"
@@ -8,7 +9,7 @@ import (
 
 func TestNewCensoringResolverFailure(t *testing.T) {
 	resolver, err := NewCensoringResolver(
-		[]string{""}, []string{""}, "antani", "1.1.1.1:853",
+		nil, nil, nil, "antani", "1.1.1.1:853",
 	)
 	if err == nil {
 		t.Fatal("expected an error here")
@@ -19,33 +20,40 @@ func TestNewCensoringResolverFailure(t *testing.T) {
 }
 
 func TestIntegrationPass(t *testing.T) {
-	server := newresolver(t, "ooni.io", "ooni.nu")
-	checkrequest(t, server, "example.com", "success")
+	server := newresolver(t, []string{"ooni.io"}, []string{"ooni.nu"}, nil)
+	checkrequest(t, server, "example.com", "success", nil)
 	killserver(t, server)
 }
 
 func TestIntegrationBlock(t *testing.T) {
-	server := newresolver(t, "ooni.io", "ooni.nu")
-	checkrequest(t, server, "mia-ps.ooni.io", "blocked")
+	server := newresolver(t, []string{"ooni.io"}, []string{"ooni.nu"}, nil)
+	checkrequest(t, server, "mia-ps.ooni.io", "blocked", nil)
 	killserver(t, server)
 }
 
 func TestIntegrationRedirect(t *testing.T) {
-	server := newresolver(t, "ooni.io", "ooni.nu")
-	checkrequest(t, server, "hkgmetadb.ooni.nu", "hijacked")
+	server := newresolver(t, []string{"ooni.io"}, []string{"ooni.nu"}, nil)
+	checkrequest(t, server, "hkgmetadb.ooni.nu", "hijacked", nil)
+	killserver(t, server)
+}
+
+func TestIntegrationIgnore(t *testing.T) {
+	server := newresolver(t, nil, nil, []string{"ooni.nu"})
+	iotimeout := "i/o timeout"
+	checkrequest(t, server, "hkgmetadb.ooni.nu", "hijacked", &iotimeout)
 	killserver(t, server)
 }
 
 func TestIntegrationLookupFailure(t *testing.T) {
-	server := newresolver(t, "", "")
+	server := newresolver(t, nil, nil, nil)
 	// we should receive same response as when we're blocked
-	checkrequest(t, server, "example.antani", "blocked")
+	checkrequest(t, server, "example.antani", "blocked", nil)
 	killserver(t, server)
 }
 
 func TestFailureNoQuestion(t *testing.T) {
 	resolver, err := NewCensoringResolver(
-		[]string{""}, []string{""}, "dot", "1.1.1.1:853",
+		nil, nil, nil, "dot", "1.1.1.1:853",
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -55,7 +63,7 @@ func TestFailureNoQuestion(t *testing.T) {
 
 func TestListenFailure(t *testing.T) {
 	resolver, err := NewCensoringResolver(
-		[]string{""}, []string{""}, "dot", "1.1.1.1:853",
+		nil, nil, nil, "dot", "1.1.1.1:853",
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -69,9 +77,9 @@ func TestListenFailure(t *testing.T) {
 	}
 }
 
-func newresolver(t *testing.T, blocked, hijacked string) *dns.Server {
+func newresolver(t *testing.T, blocked, hijacked, ignored []string) *dns.Server {
 	resolver, err := NewCensoringResolver(
-		[]string{blocked}, []string{hijacked},
+		blocked, hijacked, ignored,
 		// using faster dns because dot here causes miekg/dns's
 		// dns.Exchange to timeout and I don't want more complexity
 		"system", "",
@@ -95,11 +103,16 @@ func killserver(t *testing.T, server *dns.Server) {
 
 func checkrequest(
 	t *testing.T, server *dns.Server, host string, expectStatus string,
+	expectErrorSuffix *string,
 ) {
 	address := server.PacketConn.LocalAddr().String()
 	query := newquery(host)
 	reply, err := dns.Exchange(query, address)
 	if err != nil {
+		if expectErrorSuffix != nil &&
+			strings.HasSuffix(err.Error(), *expectErrorSuffix) {
+			return
+		}
 		t.Fatal(err)
 	}
 	switch expectStatus {

@@ -59,6 +59,11 @@ operations timeout and when a connection cannot be established (with
 Hijacking DNS traffic is useful, for example, to redirect all DNS UDP
 traffic from the box to the `dns-proxy` module.
 
+Note that with `-iptables-drop-keyword`, DNS queries containing such
+keyword will fail returning `EPERM`. For a more realistic approach to
+dropping specific DNS packets, combine DNS traffic hijacking with
+`-dns-proxy-ignore`, to "drop" packets at the DNS proxy.
+
 ### dns-proxy (aka resolver)
 
 [![GoDoc](https://godoc.org/github.com/ooni/jafar/resolver?status.svg)](
@@ -78,6 +83,8 @@ hijacking, you will need to configure your application explicitly.
         Transport to be used with the upstream DNS (default "dot")
   -dns-proxy-hijack value
         Register keyword triggering redirection to 127.0.0.1
+  -dns-proxy-ignore value
+        Register keyword causing the proxy to ignore the query
 ```
 
 The `-dns-proxy-address` flag controls the endpoint where the proxy is
@@ -94,6 +101,8 @@ query contains the specifed string shall receive an `NXDOMAIN` reply.
 The `-dns-proxy-hijack` is similar but instead lies and returns to the
 client that the requested domain is at `127.0.0.1`. This is an opportunity
 to redirect traffic to the HTTP and TLS proxies.
+
+The `-dns-proxy-ignore` is similar but instead just ignores the query.
 
 ### http-proxy
 
