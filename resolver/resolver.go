@@ -6,9 +6,10 @@ import (
 	"net"
 	"strings"
 
+	"github.com/apex/log"
 	"github.com/miekg/dns"
 	"github.com/ooni/netx"
-	"github.com/ooni/netx/handlers"
+	"github.com/ooni/netx/x/logger"
 )
 
 // CensoringResolver is a censoring resolver.
@@ -28,7 +29,7 @@ type CensoringResolver struct {
 func NewCensoringResolver(
 	blocked, hijacked, ignored []string, dnsNetwork, dnsAddress string,
 ) (*CensoringResolver, error) {
-	dialer := netx.NewDialer(handlers.StdoutHandler)
+	dialer := netx.NewDialer(logger.NewHandler(log.Log))
 	resolver, err := dialer.NewResolver(dnsNetwork, dnsAddress)
 	if err != nil {
 		return nil, err

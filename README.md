@@ -124,7 +124,7 @@ specific requests. It's controlled by these flags:
   -http-proxy-address string
         Address where the HTTP proxy should listen (default "127.0.0.1:80")
   -http-proxy-block value
-        Register keyword triggering HTTP 541 censorship
+        Register keyword triggering HTTP 451 censorship
   -http-proxy-dns-address string
         Address of the upstream DNS to be used by the proxy (default "1.1.1.1:853")
   -http-proxy-dns-transport string

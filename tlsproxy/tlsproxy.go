@@ -10,7 +10,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/ooni/netx"
-	"github.com/ooni/netx/handlers"
+	"github.com/ooni/netx/x/logger"
 )
 
 // CensoringProxy is a censoring TLS proxy
@@ -27,7 +27,7 @@ type CensoringProxy struct {
 func NewCensoringProxy(
 	keywords []string, dnsNetwork, dnsAddress string,
 ) (*CensoringProxy, error) {
-	dialer := netx.NewDialer(handlers.StdoutHandler)
+	dialer := netx.NewDialer(logger.NewHandler(log.Log))
 	proxy := &CensoringProxy{
 		keywords: keywords,
 		dial:     dialer.Dial,
