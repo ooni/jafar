@@ -8,7 +8,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/ooni/netx/handlers"
+	"github.com/apex/log"
+	"github.com/ooni/netx/x/logger"
 	"github.com/ooni/netx/httpx"
 )
 
@@ -28,7 +29,7 @@ type CensoringProxy struct {
 func NewCensoringProxy(
 	keywords []string, dnsNetwork, dnsAddress string,
 ) (*CensoringProxy, error) {
-	client := httpx.NewClient(handlers.StdoutHandler)
+	client := httpx.NewClient(logger.NewHandler(log.Log))
 	proxy := &CensoringProxy{
 		keywords:  keywords,
 		transport: client.Transport,

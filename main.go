@@ -9,6 +9,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/apex/log"
+	"github.com/apex/log/handlers/cli"
 	"github.com/m-lab/go/flagx"
 	"github.com/m-lab/go/rtx"
 	"github.com/miekg/dns"
@@ -79,7 +81,7 @@ func init() {
 	)
 	flag.Var(
 		&httpProxyBlock, "http-proxy-block",
-		"Register keyword triggering HTTP 541 censorship",
+		"Register keyword triggering HTTP 451 censorship",
 	)
 	httpProxyDNSAddress = flag.String(
 		"http-proxy-dns-address", "1.1.1.1:853",
@@ -90,7 +92,7 @@ func init() {
 		"Transport to be used with the upstream DNS",
 	)
 
-	// iptablesProxy
+	// iptables
 	flag.Var(
 		&iptablesDropIP, "iptables-drop-ip",
 		"Drop traffic to the specified IP address",
@@ -182,6 +184,8 @@ func tlsProxyStart() net.Listener {
 
 func main() {
 	flag.Parse()
+	log.SetLevel(log.DebugLevel)
+	log.SetHandler(cli.Default)
 	dnsProxyStart()
 	httpProxyStart()
 	policy := iptablesStart()
