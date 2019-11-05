@@ -10,7 +10,7 @@ easily coupled with github.com/ooni/netx.
 
 ## Building
 
-We use Go >= 1.11. Jafar also needs the C library headers,
+We use Go >= 1.13. Jafar also needs the C library headers,
 iptables installed, and root permissions.
 
 With Linux Alpine edge, you can compile Jafar with:
