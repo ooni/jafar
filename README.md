@@ -32,7 +32,7 @@ go build -v .
 
 You need to run Jafar as root. You can get a complete list
 of all flags using `./jafar -help`. Jafar is composed of modules. Each
-module is controllable via flags.
+module is controllable via flags. We describe modules below.
 
 ### iptables
 
