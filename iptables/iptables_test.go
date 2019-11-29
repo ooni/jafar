@@ -12,7 +12,7 @@ import (
 	"github.com/ooni/jafar/resolver"
 )
 
-func TestCannotApplyPolicy(t *testing.T) {
+func TestUnitCannotApplyPolicy(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("not implemented on this platform")
 	}
