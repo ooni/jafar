@@ -34,6 +34,15 @@ You need to run Jafar as root. You can get a complete list
 of all flags using `./jafar -help`. Jafar is composed of modules. Each
 module is controllable via flags. We describe modules below.
 
+### main
+
+The main module starts all the other modules. If you don't provide the
+`-main-command <command>` flag, the code will run until interrupted. If
+instead you use the `-main-command` flag, you can specify a command to
+run inside the censored environment. Use the `-main-user <username>` flag
+to select the user to use for running such command. By default, we use
+the `nobody` user for this purpose.
+
 ### iptables
 
 [![GoDoc](https://godoc.org/github.com/ooni/jafar/iptables?status.svg)](
@@ -186,4 +195,10 @@ Force all traffic through the HTTP and TLS proxy and use them to censor
           -dns-proxy-hijack play.google.com      \
           -http-proxy-block play.google.com      \
           -tls-proxy-block play.google.com
+```
+
+Run `./script.sh` in a censored environment:
+
+```
+# ./jafar -iptables-drop-ip 8.8.8.8 -main-command ./script.sh
 ```
