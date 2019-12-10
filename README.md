@@ -39,10 +39,17 @@ module is controllable via flags. We describe modules below.
 The main module starts all the other modules. If you don't provide the
 `-main-command <command>` flag, the code will run until interrupted. If
 instead you use the `-main-command` flag, you can specify a command to
-run inside the censored environment. Use the `-main-user <username>` flag
-to select the user to use for running such command. By default, we use
-the `nobody` user for this purpose. We implement this feature using `sudo`,
-therefore you need to make sure that `sudo` is installed.
+run inside the censored environment. In such case, the main module
+will exit when the specified command terminates. Note that the main
+module will properly set the exit code if the child process fails.
+
+Note that it is not possible to pass arguments to this command. If you
+need to supply arguments to it, use a shell script.
+
+Use the `-main-user <username>` flag to select the user to use for
+running child commands. By default, we use the `nobody` user for this
+purpose. We implement this feature using `sudo`, therefore you need
+to make sure that `sudo` is installed.
 
 ### iptables
 
