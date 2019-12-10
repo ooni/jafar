@@ -41,7 +41,8 @@ The main module starts all the other modules. If you don't provide the
 instead you use the `-main-command` flag, you can specify a command to
 run inside the censored environment. Use the `-main-user <username>` flag
 to select the user to use for running such command. By default, we use
-the `nobody` user for this purpose.
+the `nobody` user for this purpose. We implement this feature using `sudo`,
+therefore you need to make sure that `sudo` is installed.
 
 ### iptables
 

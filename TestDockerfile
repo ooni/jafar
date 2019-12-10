@@ -1,5 +1,5 @@
 FROM alpine:edge
-RUN apk add go git musl-dev iptables
+RUN apk add go git musl-dev iptables sudo
 ENV GOPATH=/go
 RUN go get github.com/mattn/goveralls
 ADD . /go/src/github.com/ooni/jafar
