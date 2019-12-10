@@ -3,23 +3,8 @@
 package iptables
 
 import (
-	"os"
-	"os/exec"
-	"strings"
-
-	"github.com/apex/log"
 	"github.com/m-lab/go/rtx"
 )
-
-func runCommand(name string, arg ...string) error {
-	log.Infof("exec: %s %s", name, strings.Join(arg, " "))
-	cmd := exec.Command(name, arg...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	err := cmd.Run()
-	log.Infof("exec result: %+v", err)
-	return err
-}
 
 type shell interface {
 	dropIfDestinationEquals(ip string) error
