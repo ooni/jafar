@@ -17,6 +17,7 @@ import (
 	"github.com/ooni/jafar/httpproxy"
 	"github.com/ooni/jafar/iptables"
 	"github.com/ooni/jafar/resolver"
+	"github.com/ooni/jafar/shellx"
 	"github.com/ooni/jafar/tlsproxy"
 )
 
@@ -39,7 +40,9 @@ var (
 	iptablesResetIP      flagx.StringArray
 	iptablesResetKeyword flagx.StringArray
 
-	mainCh chan os.Signal
+	mainCh      chan os.Signal
+	mainCommand *string
+	mainUser    *string
 
 	tlsProxyAddress      *string
 	tlsProxyBlock        flagx.StringArray
@@ -119,6 +122,8 @@ func init() {
 	signal.Notify(
 		mainCh, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT,
 	)
+	mainCommand = flag.String("main-command", "", "Optional command to execute")
+	mainUser = flag.String("main-user", "nobody", "Run command as user")
 
 	// tlsProxy
 	tlsProxyAddress = flag.String(
@@ -188,8 +193,14 @@ func main() {
 	log.SetHandler(cli.Default)
 	dnsProxyStart()
 	httpProxyStart()
-	policy := iptablesStart()
-	defer policy.Waive()
 	tlsProxyStart()
-	<-mainCh
+	policy := iptablesStart()
+	var err error
+	if *mainCommand != "" {
+		err = shellx.Run("sudo", "-u", *mainUser, "--", *mainCommand)
+	} else {
+		<-mainCh
+	}
+	policy.Waive()
+	rtx.Must(err, "subcommand failed")
 }
