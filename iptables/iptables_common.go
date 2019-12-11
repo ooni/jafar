@@ -7,6 +7,7 @@ import (
 )
 
 type shell interface {
+	createChains() error
 	dropIfDestinationEquals(ip string) error
 	rstIfDestinationEqualsAndIsTCP(ip string) error
 	dropIfContainsKeyword(keyword string) error
@@ -39,6 +40,8 @@ func (c *CensoringPolicy) Apply() (err error) {
 			// JUST KNOW WE'VE BEEN HERE
 		}
 	}()
+	err = c.sh.createChains()
+	rtx.PanicOnError(err, "c.sh.createChains failed")
 	// Implementation note: we want the RST rules to be first such
 	// that we end up enforcing them before the drop rules.
 	for _, keyword := range c.ResetKeywords {
