@@ -24,6 +24,22 @@ func TestUnitCannotApplyPolicy(t *testing.T) {
 	defer policy.Waive()
 }
 
+func TestUnitCreateChainsError(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("not implemented on this platform")
+	}
+	policy := NewCensoringPolicy()
+	if err := policy.Apply(); err != nil {
+		t.Fatal(err)
+	}
+	defer policy.Waive()
+	// you should not be able to apply the policy when there is
+	// already a policy, you need to waive it first
+	if err := policy.Apply(); err == nil {
+		t.Fatal("expected an error here")
+	}
+}
+
 func TestIntegrationDropIP(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("not implemented on this platform")
