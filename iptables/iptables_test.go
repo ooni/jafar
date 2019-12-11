@@ -21,6 +21,7 @@ func TestUnitCannotApplyPolicy(t *testing.T) {
 	if err := policy.Apply(); err == nil {
 		t.Fatal("expected an error here")
 	}
+	defer policy.Waive()
 }
 
 func TestIntegrationDropIP(t *testing.T) {
