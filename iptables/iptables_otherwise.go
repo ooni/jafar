@@ -6,6 +6,9 @@ import "errors"
 
 type otherwiseShell struct{}
 
+func (*otherwiseShell) createChains() error {
+	return errors.New("not implemented")
+}
 func (*otherwiseShell) dropIfDestinationEquals(ip string) error {
 	return errors.New("not implemented")
 }
