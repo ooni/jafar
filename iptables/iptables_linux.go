@@ -19,7 +19,7 @@ func (s *linuxShell) rstIfDestinationEqualsAndIsTCP(ip string) error {
 
 func (s *linuxShell) dropIfContainsKeyword(keyword string) error {
 	return shellx.Run(
-		"iptables", "-A", "OUTPUT", "-m", "string", "--algo", "bm",
+		"iptables", "-A", "OUTPUT", "-m", "string", "--algo", "kmp",
 		"--string", keyword, "-j", "DROP",
 	)
 }
@@ -27,7 +27,7 @@ func (s *linuxShell) dropIfContainsKeyword(keyword string) error {
 func (s *linuxShell) rstIfContainsKeywordAndIsTCP(keyword string) error {
 	return shellx.Run(
 		"iptables", "-A", "OUTPUT", "-m", "string", "--proto", "tcp", "--algo",
-		"bm", "--string", keyword, "-j", "REJECT", "--reject-with", "tcp-reset",
+		"kmp", "--string", keyword, "-j", "REJECT", "--reject-with", "tcp-reset",
 	)
 }
 
