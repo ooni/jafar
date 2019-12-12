@@ -63,7 +63,7 @@ def test_keys(result):
 
 
 def execute_jafar_and_return_validated_test_keys(ooni_exe, outfile, args):
-    """ Executes jafar and returns the validated parsed result, or throws
+    """ Executes jafar and returns the validated parsed test keys, or throws
         an AssertionError if the result is not valid. """
     execute_jafar(ooni_exe, outfile, args)
     result = read_result(outfile)
