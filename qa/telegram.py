@@ -62,12 +62,21 @@ def test_keys(result):
     return result["test_keys"]
 
 
+def check_maybe_binary_value(value):
+    """ Make sure a maybe binary value is correct """
+    assert (isinstance(value, str) or (
+        isinstance(value, dict) and
+        value["format"] == "base64" and
+        isinstance(value["data"], str)
+    ))
+
+
 def execute_jafar_and_return_validated_test_keys(ooni_exe, outfile, args):
     """ Executes jafar and returns the validated parsed test keys, or throws
         an AssertionError if the result is not valid. """
     execute_jafar(ooni_exe, outfile, args)
     result = read_result(outfile)
-    # TODO(bassosimone): we can write significantly more checks here
+    assert isinstance(result, dict)
     assert isinstance(result["test_keys"], dict)
     tk = result["test_keys"]
     assert isinstance(tk["requests"], list)
@@ -77,7 +86,20 @@ def execute_jafar_and_return_validated_test_keys(ooni_exe, outfile, args):
         failure = entry["failure"]
         assert isinstance(failure, str) or failure is None
         assert isinstance(entry["request"], dict)
+        req = entry["request"]
+        check_maybe_binary_value(req["body"])
+        assert isinstance(req["headers"], dict)
+        for key, value in req["headers"].items():
+            assert isinstance(key, str)
+            check_maybe_binary_value(value)
+        assert isinstance(req["method"], str)
         assert isinstance(entry["response"], dict)
+        resp = entry["response"]
+        check_maybe_binary_value(resp["body"])
+        assert isinstance(resp["code"], int)
+        for key, value in resp["headers"].items():
+            assert isinstance(key, str)
+            check_maybe_binary_value(value)
     assert isinstance(tk["tcp_connect"], list)
     assert len(tk["tcp_connect"]) > 0
     for entry in tk["tcp_connect"]:
