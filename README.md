@@ -211,7 +211,7 @@ Force all traffic through the HTTP and TLS proxy and use them to censor
           -tls-proxy-block play.google.com
 ```
 
-Run `./script.sh` in a censored environment:
+Run `ping` in a censored environment:
 
 ```
 # ./jafar -iptables-drop-ip 8.8.8.8 -main-command 'ping -c3 8.8.8.8'
