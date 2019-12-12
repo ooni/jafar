@@ -27,7 +27,7 @@ func TestIntegrationRunCommandline(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
-	t.Run("when we have a single argument", func(t *testing.T) {
+	t.Run("when we have more than one argument", func(t *testing.T) {
 		if err := RunCommandline("ls ."); err != nil {
 			t.Fatal(err)
 		}
