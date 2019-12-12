@@ -112,7 +112,7 @@ func TestIntegrationDropKeywordHex(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected an error here")
 	}
-	if err.Error() != "Get http://www.ooni.io: context deadline exceeded" {
+	if !strings.HasSuffix(err.Error(), "operation not permitted") {
 		t.Fatal("unexpected error occurred")
 	}
 	if resp != nil {
