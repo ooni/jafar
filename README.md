@@ -48,7 +48,7 @@ such that your shell passes the whole string to the specified option, as
 in `-main-command 'ls -lha'`. This will execute the `ls -lha` command line
 inside the censored Jafar context. You can also combine that with quoting
 and variables interpolation, e.g., `-main-command "echo '$USER is the
-walrus'". The `$USER` variable will be expanded by your shell. Assuming
+walrus'"`. The `$USER` variable will be expanded by your shell. Assuming
 your user name is `paul`, then Jafar will lex the main command as `echo
 "paul is the walrus"` and will execute it.
 
