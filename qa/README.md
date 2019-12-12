@@ -10,4 +10,4 @@ compatible command line interface. Tools with this CLI are:
 3. `github.com/ooni/probe-engine/cmd/miniooni`
 
 These scripts assume you're on a Linux system with `iptables`, `bash`,
-`pythone3`, and possibly a bunch of other tools installed.
+`python3`, and possibly a bunch of other tools installed.
