@@ -43,8 +43,14 @@ run inside the censored environment. In such case, the main module
 will exit when the specified command terminates. Note that the main
 module will properly set the exit code if the child process fails.
 
-Note that it is not possible to pass arguments to this command. If you
-need to supply arguments to it, use a shell script.
+The command can also include arguments. Make sure you quote the arguments
+such that your shell passes the whole string to the specified option, as
+in `-main-command 'ls -lha'`. This will execute the `ls -lha` command line
+inside the censored Jafar context. You can also combine that with quoting
+and variables interpolation, e.g., `-main-command "echo '$USER is the
+walrus'"`. The `$USER` variable will be expanded by your shell. Assuming
+your user name is `paul`, then Jafar will lex the main command as `echo
+"paul is the walrus"` and will execute it.
 
 Use the `-main-user <username>` flag to select the user to use for
 running child commands. By default, we use the `nobody` user for this
@@ -205,8 +211,8 @@ Force all traffic through the HTTP and TLS proxy and use them to censor
           -tls-proxy-block play.google.com
 ```
 
-Run `./script.sh` in a censored environment:
+Run `ping` in a censored environment:
 
 ```
-# ./jafar -iptables-drop-ip 8.8.8.8 -main-command ./script.sh
+# ./jafar -iptables-drop-ip 8.8.8.8 -main-command 'ping -c3 8.8.8.8'
 ```

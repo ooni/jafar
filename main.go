@@ -3,6 +3,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -197,7 +198,9 @@ func main() {
 	policy := iptablesStart()
 	var err error
 	if *mainCommand != "" {
-		err = shellx.Run("sudo", "-u", *mainUser, "--", *mainCommand)
+		err = shellx.RunCommandline(fmt.Sprintf(
+			"sudo -u '%s' -- %s", *mainUser, *mainCommand,
+		))
 	} else {
 		<-mainCh
 	}
