@@ -35,11 +35,13 @@ var (
 	httpProxyDNSAddress   *string
 	httpProxyDNSTransport *string
 
-	iptablesDropIP       flagx.StringArray
-	iptablesDropKeyword  flagx.StringArray
-	iptablesHijackDNSTo  *string
-	iptablesResetIP      flagx.StringArray
-	iptablesResetKeyword flagx.StringArray
+	iptablesDropIP          flagx.StringArray
+	iptablesDropKeywordHex  flagx.StringArray
+	iptablesDropKeyword     flagx.StringArray
+	iptablesHijackDNSTo     *string
+	iptablesResetIP         flagx.StringArray
+	iptablesResetKeywordHex flagx.StringArray
+	iptablesResetKeyword    flagx.StringArray
 
 	mainCh      chan os.Signal
 	mainCommand *string
@@ -102,6 +104,10 @@ func init() {
 		"Drop traffic to the specified IP address",
 	)
 	flag.Var(
+		&iptablesDropKeywordHex, "iptables-drop-keyword-hex",
+		"Drop traffic containing the specified keyword in hex",
+	)
+	flag.Var(
 		&iptablesDropKeyword, "iptables-drop-keyword",
 		"Drop traffic containing the specified keyword",
 	)
@@ -112,6 +118,10 @@ func init() {
 	flag.Var(
 		&iptablesResetIP, "iptables-reset-ip",
 		"Reset TCP/IP traffic to the specified IP address",
+	)
+	flag.Var(
+		&iptablesResetKeywordHex, "iptables-reset-keyword-hex",
+		"Reset TCP/IP traffic containing the specified keyword in hex",
 	)
 	flag.Var(
 		&iptablesResetKeyword, "iptables-reset-keyword",
@@ -169,9 +179,11 @@ func httpProxyStart() *http.Server {
 func iptablesStart() *iptables.CensoringPolicy {
 	policy := iptables.NewCensoringPolicy()
 	policy.DropIPs = iptablesDropIP
+	policy.DropKeywordsHex = iptablesDropKeywordHex
 	policy.DropKeywords = iptablesDropKeyword
 	policy.HijackDNSAddress = *iptablesHijackDNSTo
 	policy.ResetIPs = iptablesResetIP
+	policy.ResetKeywordsHex = iptablesResetKeywordHex
 	policy.ResetKeywords = iptablesResetKeyword
 	err := policy.Apply()
 	rtx.Must(err, "policy.Apply failed")

@@ -41,10 +41,24 @@ func (s *linuxShell) rstIfDestinationEqualsAndIsTCP(ip string) error {
 	)
 }
 
+func (s *linuxShell) dropIfContainsKeywordHex(keyword string) error {
+	return shellx.Run(
+		"iptables", "-A", "JAFAR_OUTPUT", "-m", "string", "--algo", "kmp",
+		"--hex-string", keyword, "-j", "DROP",
+	)
+}
+
 func (s *linuxShell) dropIfContainsKeyword(keyword string) error {
 	return shellx.Run(
 		"iptables", "-A", "JAFAR_OUTPUT", "-m", "string", "--algo", "kmp",
 		"--string", keyword, "-j", "DROP",
+	)
+}
+
+func (s *linuxShell) rstIfContainsKeywordHexAndIsTCP(keyword string) error {
+	return shellx.Run(
+		"iptables", "-A", "JAFAR_OUTPUT", "-m", "string", "--proto", "tcp", "--algo",
+		"kmp", "--hex-string", keyword, "-j", "REJECT", "--reject-with", "tcp-reset",
 	)
 }
 

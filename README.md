@@ -67,12 +67,16 @@ The iptables module is only available on Linux. It exports these flags:
 ```
   -iptables-drop-ip value
         Drop traffic to the specified IP address
+  -iptables-drop-keyword-hex value
+        Drop traffic containing the specified hex keyword
   -iptables-drop-keyword value
         Drop traffic containing the specified keyword
   -iptables-hijack-dns-to string
         Hijack all DNS UDP traffic to the specified endpoint
   -iptables-reset-ip value
         Reset TCP/IP traffic to the specified IP address
+  -iptables-reset-keyword-hex value
+        Reset TCP/IP traffic containing the specified hex keyword
   -iptables-reset-keyword value
         Reset TCP/IP traffic containing the specified keyword
 ```
@@ -89,6 +93,10 @@ operations timeout and when a connection cannot be established (with
 
 Hijacking DNS traffic is useful, for example, to redirect all DNS UDP
 traffic from the box to the `dns-proxy` module.
+
+When matching keywords, the simplest option is to use ASCII strings as
+in `-iptables-drop-keyword ooni`. However, you can also specify a sequence
+of hex bytes, as in `-iptables-drop-keyword-hex |6f 6f 6e 69|`.
 
 Note that with `-iptables-drop-keyword`, DNS queries containing such
 keyword will fail returning `EPERM`. For a more realistic approach to
