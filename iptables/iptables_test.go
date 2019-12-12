@@ -92,6 +92,34 @@ func TestIntegrationDropKeyword(t *testing.T) {
 	}
 }
 
+func TestIntegrationDropKeywordHex(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("not implemented on this platform")
+	}
+	policy := NewCensoringPolicy()
+	policy.DropKeywordsHex = []string{"|6f 6f 6e 69|"}
+	if err := policy.Apply(); err != nil {
+		t.Fatal(err)
+	}
+	defer policy.Waive()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	req, err := http.NewRequest("GET", "http://www.ooni.io", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req.WithContext(ctx))
+	if err == nil {
+		t.Fatal("expected an error here")
+	}
+	if !strings.HasSuffix(err.Error(), "operation not permitted") {
+		t.Fatal("unexpected error occurred")
+	}
+	if resp != nil {
+		t.Fatal("expected nil response here")
+	}
+}
+
 func TestIntegrationResetIP(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("not implemented on this platform")
@@ -136,6 +164,27 @@ func TestIntegrationResetKeyword(t *testing.T) {
 	}
 }
 
+func TestIntegrationResetKeywordHex(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("not implemented on this platform")
+	}
+	policy := NewCensoringPolicy()
+	policy.ResetKeywordsHex = []string{"|6f 6f 6e 69|"}
+	if err := policy.Apply(); err != nil {
+		t.Fatal(err)
+	}
+	defer policy.Waive()
+	resp, err := http.Get("http://www.ooni.io")
+	if err == nil {
+		t.Fatal("expected an error here")
+	}
+	if strings.Contains(err.Error(), "read: connection reset by peer") == false {
+		t.Fatal("unexpected error occurred")
+	}
+	if resp != nil {
+		t.Fatal("expected nil response here")
+	}
+}
 func TestIntegrationHijackDNS(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("not implemented on this platform")

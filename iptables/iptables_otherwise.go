@@ -15,7 +15,13 @@ func (*otherwiseShell) dropIfDestinationEquals(ip string) error {
 func (*otherwiseShell) rstIfDestinationEqualsAndIsTCP(ip string) error {
 	return errors.New("not implemented")
 }
+func (*otherwiseShell) dropIfContainsKeywordHex(keyword string) error {
+	return errors.New("not implemented")
+}
 func (*otherwiseShell) dropIfContainsKeyword(keyword string) error {
+	return errors.New("not implemented")
+}
+func (*otherwiseShell) rstIfContainsKeywordHexAndIsTCP(keyword string) error {
 	return errors.New("not implemented")
 }
 func (*otherwiseShell) rstIfContainsKeywordAndIsTCP(keyword string) error {
