@@ -11,3 +11,15 @@ compatible command line interface. Tools with this CLI are:
 
 These scripts assume you're on a Linux system with `iptables`, `bash`,
 `python3`, and possibly a bunch of other tools installed.
+
+To run a QA session using Docker:
+
+```
+host$ ./qa/docker/start.sh
+[...]
+docker# ./qa/docker/telegram.sh
+[...]
+```
+
+If it stops because of an error, you can check the output above from
+`miniooni` and the `telegram.jsonl` file to understand what was wrong.

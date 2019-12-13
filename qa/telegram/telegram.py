@@ -10,6 +10,8 @@
 # TODO(bassosimone): I sometimes see tests failing with eof_error, which is
 # probably caused by me using a mobile connection. I believe we should attempt
 # to be strict here, because we're doing QA. But maybe I'm wrong?
+#
+# For now, I'm adding a bunch of sleeps to mitigate.
 
 import contextlib
 import json
@@ -17,6 +19,7 @@ import os
 import shlex
 import subprocess
 import sys
+import time
 import urllib.parse
 
 
@@ -268,6 +271,7 @@ def main():
     ]
     for test in tests:
         test(ooni_exe, outfile)
+        time.sleep(1.7)
 
 
 if __name__ == "__main__":
