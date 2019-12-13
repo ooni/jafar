@@ -3,7 +3,9 @@
 This directory contains quality assurance scripts that use Jafar to
 ensure that OONI implementations behave. These scripts take as unique
 command line argument the path to a binary with a OONI Probe v2.x
-compatible command line interface. Tools with this CLI are:
+compatible command line interface.
+
+Tools with this CLI are:
 
 1. `github.com/ooni/probe-legacy`
 2. `github.com/measurement-kit/measurement-kit/src/measurement_kit`
@@ -43,6 +45,8 @@ started the container, then run:
 ```
 
 This will eventually run the Python script you would run on Linux.
+
+For now, the docker scripts only perform QA of `miniooni`.
 
 ## Diagnosing issues
 
