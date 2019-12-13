@@ -224,3 +224,8 @@ Run `ping` in a censored environment:
 ```
 # ./jafar -iptables-drop-ip 8.8.8.8 -main-command 'ping -c3 8.8.8.8'
 ```
+
+## Quality assurance of OONI implementations
+
+The [qa](qa) directory contains scripts that can be useful to perform
+quality assurance of existing OONI implementations.
