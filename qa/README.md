@@ -9,17 +9,47 @@ compatible command line interface. Tools with this CLI are:
 2. `github.com/measurement-kit/measurement-kit/src/measurement_kit`
 3. `github.com/ooni/probe-engine/cmd/miniooni`
 
+## Run QA on a Linux system
+
 These scripts assume you're on a Linux system with `iptables`, `bash`,
 `python3`, and possibly a bunch of other tools installed.
 
-To run a QA session using Docker:
+To start the QA script, run this command:
 
-```
-host$ ./qa/docker/start.sh
-[...]
-docker# ./qa/docker/telegram.sh
-[...]
+```bash
+sudo ./qa/$nettest/$nettest.py $ooni_exe
 ```
 
-If it stops because of an error, you can check the output above from
-`miniooni` and the `telegram.jsonl` file to understand what was wrong.
+where `$nettest` is the nettest name (e.g. `telegram`) and `$ooni_exe`
+is the OONI Probe v2.x compatible binary to test.
+
+The Python script needs to run as root. Note however that sudo will also
+be used to run `$ooni_exe` with the privileges of the `$SUDO_USER` that
+called `sudo ./qa/$nettest/$nettest.py ...`.
+
+## Run QA using a docker container
+
+Build and start a suitable docker container using:
+
+```
+./qa/docker/start.sh
+```
+
+Note that this will run a `--privileged` docker container. Once you have
+started the container, then run:
+
+```
+./qa/docker/$nettest.sh
+```
+
+This will eventually run the Python script you would run on Linux.
+
+## Diagnosing issues
+
+The Python script that performs the QA runs a specific OONI test under
+different failure conditions and stops at the first unexpected value found
+in the resulting JSONL report. You can infer what went wrong by reading
+the output of the `$ooni_exe` command itself, which should be above the point
+where the Python script stopped, as well as by inspecting the JSONL file on
+disk. By convention such file is named `$nettest.jsonl` and only contains
+the result of the last run of `$nettest`.
