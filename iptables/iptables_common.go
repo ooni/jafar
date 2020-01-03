@@ -15,19 +15,23 @@ type shell interface {
 	rstIfContainsKeywordHexAndIsTCP(keyword string) error
 	rstIfContainsKeywordAndIsTCP(keyword string) error
 	hijackDNS(address string) error
+	hijackHTTPS(address string) error
+	hijackHTTP(address string) error
 	waive() error
 }
 
 // CensoringPolicy implements a censoring policy.
 type CensoringPolicy struct {
-	DropIPs          []string // drop IP traffic to these IPs
-	DropKeywordsHex  []string // drop IP packets with these hex keywords
-	DropKeywords     []string // drop IP packets with these keywords
-	HijackDNSAddress string   // where to hijack DNS
-	ResetIPs         []string // RST TCP/IP traffic to these IPs
-	ResetKeywordsHex []string // RST TCP/IP flows with these hex keywords
-	ResetKeywords    []string // RST TCP/IP flows with these keywords
-	sh               shell
+	DropIPs            []string // drop IP traffic to these IPs
+	DropKeywordsHex    []string // drop IP packets with these hex keywords
+	DropKeywords       []string // drop IP packets with these keywords
+	HijackDNSAddress   string   // where to hijack DNS to
+	HijackHTTPSAddress string   // where to hijack HTTPS to
+	HijackHTTPAddress  string   // where to hijack HTTP to
+	ResetIPs           []string // RST TCP/IP traffic to these IPs
+	ResetKeywordsHex   []string // RST TCP/IP flows with these hex keywords
+	ResetKeywords      []string // RST TCP/IP flows with these keywords
+	sh                 shell
 }
 
 // NewCensoringPolicy returns a new censoring policy.
@@ -75,6 +79,14 @@ func (c *CensoringPolicy) Apply() (err error) {
 	if c.HijackDNSAddress != "" {
 		err = c.sh.hijackDNS(c.HijackDNSAddress)
 		rtx.PanicOnError(err, "c.sh.hijackDNS failed")
+	}
+	if c.HijackHTTPSAddress != "" {
+		err = c.sh.hijackHTTPS(c.HijackHTTPSAddress)
+		rtx.PanicOnError(err, "c.sh.hijackHTTPS failed")
+	}
+	if c.HijackHTTPAddress != "" {
+		err = c.sh.hijackHTTP(c.HijackHTTPAddress)
+		rtx.PanicOnError(err, "c.sh.hijackHTTP failed")
 	}
 	return
 }

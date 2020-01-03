@@ -2,14 +2,19 @@ package iptables
 
 import (
 	"context"
+	"errors"
 	"net"
 	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"os/exec"
 	"runtime"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/ooni/jafar/resolver"
+	"github.com/ooni/jafar/shellx"
 )
 
 func TestUnitCannotApplyPolicy(t *testing.T) {
@@ -215,5 +220,78 @@ func TestIntegrationHijackDNS(t *testing.T) {
 	}
 	if addrs != nil {
 		t.Fatal("expected nil addrs here")
+	}
+}
+
+func TestIntegrationHijackHTTP(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("not implemented on this platform")
+	}
+	// Implementation note: this test is complicated by the fact
+	// that we are running as root and so we're whitelisted.
+	server := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(451)
+		}),
+	)
+	defer server.Close()
+	policy := NewCensoringPolicy()
+	pu, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	policy.HijackHTTPAddress = pu.Host
+	if err := policy.Apply(); err != nil {
+		t.Fatal(err)
+	}
+	defer policy.Waive()
+	err = shellx.Run("sudo", "-u", "nobody", "--",
+		"curl", "-sf", "http://example.com")
+	if err == nil {
+		t.Fatal("expected an error here")
+	}
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatal("not the error type we expected")
+	}
+	if exitErr.ExitCode() != 22 {
+		t.Fatal("not the exit code we expected")
+	}
+}
+
+func TestIntegrationHijackHTTPS(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("not implemented on this platform")
+	}
+	// Implementation note: this test is complicated by the fact
+	// that we are running as root and so we're whitelisted.
+	server := httptest.NewTLSServer(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(451)
+		}),
+	)
+	defer server.Close()
+	policy := NewCensoringPolicy()
+	pu, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	policy.HijackHTTPSAddress = pu.Host
+	if err := policy.Apply(); err != nil {
+		t.Fatal(err)
+	}
+	defer policy.Waive()
+	err = shellx.Run("sudo", "-u", "nobody", "--",
+		"curl", "-sf", "https://example.com")
+	if err == nil {
+		t.Fatal("expected an error here")
+	}
+	t.Log(err)
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatal("not the error type we expected")
+	}
+	if exitErr.ExitCode() != 60 {
+		t.Fatal("not the exit code we expected")
 	}
 }

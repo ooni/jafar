@@ -79,6 +79,26 @@ func (s *linuxShell) hijackDNS(address string) error {
 	)
 }
 
+func (s *linuxShell) hijackHTTPS(address string) error {
+	// We need to whitelist root otherwise the traffic sent by Jafar
+	// itself will match the rule and loop.
+	return shellx.Run(
+		"iptables", "-t", "nat", "-A", "JAFAR_NAT_OUTPUT", "-p", "tcp",
+		"--dport", "443", "-m", "owner", "!", "--uid-owner", "0",
+		"-j", "DNAT", "--to", address,
+	)
+}
+
+func (s *linuxShell) hijackHTTP(address string) error {
+	// We need to whitelist root otherwise the traffic sent by Jafar
+	// itself will match the rule and loop.
+	return shellx.Run(
+		"iptables", "-t", "nat", "-A", "JAFAR_NAT_OUTPUT", "-p", "tcp",
+		"--dport", "80", "-m", "owner", "!", "--uid-owner", "0",
+		"-j", "DNAT", "--to", address,
+	)
+}
+
 func (s *linuxShell) waive() error {
 	shellx.Run("iptables", "-D", "OUTPUT", "-j", "JAFAR_OUTPUT")
 	shellx.Run("iptables", "-D", "INPUT", "-j", "JAFAR_INPUT")

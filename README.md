@@ -73,6 +73,10 @@ The iptables module is only available on Linux. It exports these flags:
         Drop traffic containing the specified keyword
   -iptables-hijack-dns-to string
         Hijack all DNS UDP traffic to the specified endpoint
+  -iptables-hijack-https-to string
+        Hijack all HTTPS traffic to the specified endpoint
+  -iptables-hijack-http-to string
+        Hijack all HTTP traffic to the specified endpoint
   -iptables-reset-ip value
         Reset TCP/IP traffic to the specified IP address
   -iptables-reset-keyword-hex value
@@ -93,6 +97,11 @@ operations timeout and when a connection cannot be established (with
 
 Hijacking DNS traffic is useful, for example, to redirect all DNS UDP
 traffic from the box to the `dns-proxy` module.
+
+Hijacking HTTP and HTTPS traffic actually hijacks based on ports rather
+than on DPI. As a known bug, when hijacking HTTP or HTTPS traffic, we
+do not hijack traffic owned by root. This is because Jafar runs as root
+and therefore its traffic must not match the hijack rule.
 
 When matching keywords, the simplest option is to use ASCII strings as
 in `-iptables-drop-keyword ooni`. However, you can also specify a sequence
@@ -223,6 +232,15 @@ Run `ping` in a censored environment:
 
 ```
 # ./jafar -iptables-drop-ip 8.8.8.8 -main-command 'ping -c3 8.8.8.8'
+```
+
+Run `curl` in a censored environment where it cannot connect to
+`play.google.com` using `https`:
+
+```
+# ./jafar -iptables-hijack-https-to 127.0.0.1:443         \
+          -tls-proxy-block play.google.com                \
+          -main-command 'curl -Lv http://play.google.com'
 ```
 
 ## Quality assurance of OONI implementations
