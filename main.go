@@ -2,11 +2,13 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
 	"syscall"
 
@@ -214,6 +216,20 @@ func tlsProxyStart() net.Listener {
 	return listener
 }
 
+func mustx(err error, message string, osExit func(int)) {
+	if err != nil {
+		var (
+			exitcode = 1
+			exiterr  *exec.ExitError
+		)
+		if errors.As(err, &exiterr) {
+			exitcode = exiterr.ExitCode()
+		}
+		log.Errorf("%s", message)
+		osExit(exitcode)
+	}
+}
+
 func main() {
 	flag.Parse()
 	log.SetLevel(log.DebugLevel)
@@ -231,5 +247,5 @@ func main() {
 		<-mainCh
 	}
 	policy.Waive()
-	rtx.Must(err, "subcommand failed")
+	mustx(err, "subcommand failed", os.Exit)
 }

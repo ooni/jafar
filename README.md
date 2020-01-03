@@ -41,7 +41,7 @@ The main module starts all the other modules. If you don't provide the
 instead you use the `-main-command` flag, you can specify a command to
 run inside the censored environment. In such case, the main module
 will exit when the specified command terminates. Note that the main
-module will properly set the exit code if the child process fails.
+module will propagate the child exit code, if the child fails.
 
 The command can also include arguments. Make sure you quote the arguments
 such that your shell passes the whole string to the specified option, as
