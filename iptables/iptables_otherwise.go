@@ -30,6 +30,12 @@ func (*otherwiseShell) rstIfContainsKeywordAndIsTCP(keyword string) error {
 func (*otherwiseShell) hijackDNS(address string) error {
 	return errors.New("not implemented")
 }
+func (*otherwiseShell) hijackHTTPS(address string) error {
+	return errors.New("not implemented")
+}
+func (*otherwiseShell) hijackHTTP(address string) error {
+	return errors.New("not implemented")
+}
 func (*otherwiseShell) waive() error {
 	return errors.New("not implemented")
 }

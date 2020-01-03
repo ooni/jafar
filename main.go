@@ -39,6 +39,8 @@ var (
 	iptablesDropKeywordHex  flagx.StringArray
 	iptablesDropKeyword     flagx.StringArray
 	iptablesHijackDNSTo     *string
+	iptablesHijackHTTPSTo   *string
+	iptablesHijackHTTPTo    *string
 	iptablesResetIP         flagx.StringArray
 	iptablesResetKeywordHex flagx.StringArray
 	iptablesResetKeyword    flagx.StringArray
@@ -115,6 +117,14 @@ func init() {
 		"iptables-hijack-dns-to", "",
 		"Hijack all DNS UDP traffic to the specified endpoint",
 	)
+	iptablesHijackHTTPSTo = flag.String(
+		"iptables-hijack-https-to", "",
+		"Hijack all HTTPS traffic to the specified endpoint",
+	)
+	iptablesHijackHTTPTo = flag.String(
+		"iptables-hijack-http-to", "",
+		"Hijack all HTTP traffic to the specified endpoint",
+	)
 	flag.Var(
 		&iptablesResetIP, "iptables-reset-ip",
 		"Reset TCP/IP traffic to the specified IP address",
@@ -178,10 +188,14 @@ func httpProxyStart() *http.Server {
 
 func iptablesStart() *iptables.CensoringPolicy {
 	policy := iptables.NewCensoringPolicy()
+	// For robustness waive the policy so we start afresh
+	policy.Waive()
 	policy.DropIPs = iptablesDropIP
 	policy.DropKeywordsHex = iptablesDropKeywordHex
 	policy.DropKeywords = iptablesDropKeyword
 	policy.HijackDNSAddress = *iptablesHijackDNSTo
+	policy.HijackHTTPSAddress = *iptablesHijackHTTPSTo
+	policy.HijackHTTPAddress = *iptablesHijackHTTPTo
 	policy.ResetIPs = iptablesResetIP
 	policy.ResetKeywordsHex = iptablesResetKeywordHex
 	policy.ResetKeywords = iptablesResetKeyword
