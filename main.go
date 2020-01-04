@@ -17,6 +17,7 @@ import (
 	"github.com/m-lab/go/flagx"
 	"github.com/m-lab/go/rtx"
 	"github.com/miekg/dns"
+	"github.com/ooni/jafar/badproxy"
 	"github.com/ooni/jafar/httpproxy"
 	"github.com/ooni/jafar/iptables"
 	"github.com/ooni/jafar/resolver"
@@ -25,6 +26,8 @@ import (
 )
 
 var (
+	badProxyAddress *string
+
 	dnsProxyAddress      *string
 	dnsProxyBlock        flagx.StringArray
 	dnsProxyDNSAddress   *string
@@ -58,6 +61,12 @@ var (
 )
 
 func init() {
+	// badProxy
+	badProxyAddress = flag.String(
+		"bad-proxy-address", "127.0.0.1:7117",
+		"Address where the bad proxy should listen",
+	)
+
 	// dnsProxy
 	dnsProxyAddress = flag.String(
 		"dns-proxy-address", "127.0.0.1:53",
@@ -167,6 +176,13 @@ func init() {
 	)
 }
 
+func badProxyStart() net.Listener {
+	proxy := badproxy.NewCensoringProxy()
+	listener, err := proxy.Start(*badProxyAddress)
+	rtx.Must(err, "proxy.Start failed")
+	return listener
+}
+
 func dnsProxyStart() *dns.Server {
 	proxy, err := resolver.NewCensoringResolver(
 		dnsProxyBlock, dnsProxyHijack, dnsProxyIgnore,
@@ -234,6 +250,7 @@ func main() {
 	flag.Parse()
 	log.SetLevel(log.DebugLevel)
 	log.SetHandler(cli.Default)
+	badProxyStart()
 	dnsProxyStart()
 	httpProxyStart()
 	tlsProxyStart()

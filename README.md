@@ -205,6 +205,17 @@ The `-tls-proxy-block` specifies which string or strings should cause the
 proxy to return an internal-erorr alert when the incoming ClientHello's SNI
 contains one of the strings provided with this option.
 
+### bad-proxy
+
+```
+  -bad-proxy-address string
+        Address where the bad proxy should listen (default "127.0.0.1:7117")
+```
+
+The bad proxy is a proxy that reads some bytes from any incoming connection
+and then closes the connection without replying anything. This simulates a
+proxy that is not working properly, hence the name of the module.
+
 ## Examples
 
 Block `play.google.com` with RST injection, force DNS traffic to use the our
