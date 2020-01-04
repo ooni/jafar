@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/apex/log"
-	"github.com/ooni/netx/x/logger"
 	"github.com/ooni/netx/httpx"
+	"github.com/ooni/netx/x/logger"
 )
 
 const product = "jafar/0.1.0"
@@ -37,6 +37,14 @@ func NewCensoringProxy(
 	return proxy, client.ConfigureDNS(dnsNetwork, dnsAddress)
 }
 
+var blockpage = []byte(`<html><head>
+  <title>451 Unavailable For Legal Reasons</title>
+</head><body>
+  <center><h1>451 Unavailable For Legal Reasons</h1></center>
+  <p>This content is not available in your jurisdiction.</p>
+</body></html>
+`)
+
 // ServeHTTP serves HTTP requests
 func (p *CensoringProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Implementation note: use Via header to detect in a loose way
@@ -48,6 +56,7 @@ func (p *CensoringProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for _, pattern := range p.keywords {
 		if strings.Contains(r.Host, pattern) {
 			w.WriteHeader(http.StatusUnavailableForLegalReasons)
+			w.Write(blockpage)
 			return
 		}
 	}
