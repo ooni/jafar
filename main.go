@@ -250,10 +250,14 @@ func main() {
 	flag.Parse()
 	log.SetLevel(log.DebugLevel)
 	log.SetHandler(cli.Default)
-	badProxyStart()
-	dnsProxyStart()
-	httpProxyStart()
-	tlsProxyStart()
+	badlistener := badProxyStart()
+	defer badlistener.Close()
+	dnsproxy := dnsProxyStart()
+	defer dnsproxy.Shutdown()
+	httpproxy := httpProxyStart()
+	defer httpproxy.Close()
+	tlslistener := tlsProxyStart()
+	defer tlslistener.Close()
 	policy := iptablesStart()
 	var err error
 	if *mainCommand != "" {
