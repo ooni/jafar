@@ -49,10 +49,7 @@ func (p *CensoringProxy) serve(conn net.Conn) {
 	// request for cleartext connections. This may break in several cases
 	// but is good enough approximation of these bad proxies for now.
 	if tlsconn, ok := conn.(*tls.Conn); ok {
-		if err := tlsconn.Handshake(); err != nil {
-			tlsconn.Close()
-			return
-		}
+		tlsconn.Handshake()
 	} else {
 		const maxread = 1 << 17
 		reader := io.LimitReader(conn, maxread)

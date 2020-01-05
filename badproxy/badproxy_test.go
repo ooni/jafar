@@ -29,6 +29,10 @@ func TestIntegrationTLS(t *testing.T) {
 			if err != nil {
 				return nil, err
 			}
+			if err = conn.Handshake(); err != nil {
+				conn.Close()
+				return nil, err
+			}
 			return conn, nil
 		})
 	killproxy(t, listener)
@@ -147,9 +151,6 @@ func checkdial(
 		t.Fatal("expected nil conn")
 	}
 	if conn != nil {
-		if tlsconn, ok := conn.(*tls.Conn); ok {
-			tlsconn.Handshake()
-		}
 		conn.Write([]byte("123454321"))
 		conn.Close()
 	}
