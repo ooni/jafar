@@ -198,7 +198,7 @@ func badProxyStart() net.Listener {
 func badProxyStartTLS() net.Listener {
 	proxy := badproxy.NewCensoringProxy()
 	listener, cert, err := proxy.StartTLS(*badProxyAddressTLS)
-	rtx.Must(err, "proxy.Start failed")
+	rtx.Must(err, "proxy.StartTLS failed")
 	err = ioutil.WriteFile(*badProxyTLSOutputCA, pem.EncodeToMemory(&pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: cert.Raw,
