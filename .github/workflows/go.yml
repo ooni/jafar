@@ -18,7 +18,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        apt install curl dnsutils
+        sudo apt install curl dnsutils
         go mod download
 
     - name: Run tests written in Go
