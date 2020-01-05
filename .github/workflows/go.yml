@@ -16,5 +16,23 @@ jobs:
     - name: Check out code into the Go module directory
       uses: actions/checkout@v1
 
-    - name: Build
+    - name: Install dependencies
+      run: |
+        apt install curl dnsutils
+        go mod download
+
+    - name: Run tests written in Go
+      run: go test -race -covermode atomic -coverprofile=jafar.cov ./...
+
+    - name: Send coverage
+      env:
+        COVERALLS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        GO111MODULE=off go get github.com/mattn/goveralls
+        $(go env GOPATH)/bin/goveralls -coverprofile=jafar.cov -service=github
+
+    - name: Build jafar
       run: go build -v .
+
+    - name: Run external tests
+      run: ./test/all.bash
