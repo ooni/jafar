@@ -97,7 +97,7 @@ function sni_man_in_the_middle() {
 
 function sni_got_nothing() {
   expectexitcode 52 execute ./jafar -iptables-hijack-https-to 127.0.0.1:4114  \
-    -main-command 'curl -sm5 --cacert badproxy.pem --connect-to ::example.com: https://ooni.io'
+    -main-command 'curl -vsm5 --cacert badproxy.pem --connect-to ::example.com: https://ooni.io'
 }
 
 function sni_connect_error() {
