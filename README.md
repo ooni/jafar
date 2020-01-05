@@ -265,6 +265,8 @@ Run `curl` in a censored environment where it cannot connect to
           -main-command 'curl -Lv http://play.google.com'
 ```
 
+For more usage examples, see `./test/all.bash`.
+
 ## Quality assurance of OONI implementations
 
 The [qa](qa) directory contains scripts that can be useful to perform
