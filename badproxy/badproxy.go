@@ -3,21 +3,41 @@
 package badproxy
 
 import (
+	"crypto/rsa"
+	"crypto/tls"
+	"crypto/x509"
 	"io"
 	"io/ioutil"
 	"net"
 	"strings"
 	"time"
+
+	"github.com/google/martian/v3/mitm"
 )
 
 // CensoringProxy is a bad proxy
 type CensoringProxy struct {
-	listener net.Listener
+	mitmNewAuthority func(
+		name string, organization string,
+		validity time.Duration,
+	) (*x509.Certificate, *rsa.PrivateKey, error)
+
+	mitmNewConfig func(
+		ca *x509.Certificate, privateKey interface{},
+	) (*mitm.Config, error)
+
+	tlsListen func(
+		network string, laddr string, config *tls.Config,
+	) (net.Listener, error)
 }
 
 // NewCensoringProxy creates a new bad proxy
 func NewCensoringProxy() *CensoringProxy {
-	return new(CensoringProxy)
+	return &CensoringProxy{
+		mitmNewAuthority: mitm.NewAuthority,
+		mitmNewConfig:    mitm.NewConfig,
+		tlsListen:        tls.Listen,
+	}
 }
 
 func (p *CensoringProxy) serve(conn net.Conn) {
@@ -44,7 +64,7 @@ func (p *CensoringProxy) run(listener net.Listener) {
 	}
 }
 
-// Start starts the bad proxy
+// Start starts the bad proxy for TCP.
 func (p *CensoringProxy) Start(address string) (net.Listener, error) {
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
@@ -52,4 +72,24 @@ func (p *CensoringProxy) Start(address string) (net.Listener, error) {
 	}
 	go p.run(listener)
 	return listener, nil
+}
+
+// StartTLS starts the bad proxy for TLS.
+func (p *CensoringProxy) StartTLS(address string) (net.Listener, *x509.Certificate, error) {
+	cert, privkey, err := p.mitmNewAuthority(
+		"jafar", "OONI", 24*time.Hour,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	config, err := p.mitmNewConfig(cert, privkey)
+	if err != nil {
+		return nil, nil, err
+	}
+	listener, err := p.tlsListen("tcp", address, config.TLS())
+	if err != nil {
+		return nil, nil, err
+	}
+	go p.run(listener)
+	return listener, cert, nil
 }
