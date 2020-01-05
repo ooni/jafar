@@ -147,6 +147,9 @@ func checkdial(
 		t.Fatal("expected nil conn")
 	}
 	if conn != nil {
+		if tlsconn, ok := conn.(*tls.Conn); ok {
+			tlsconn.Handshake()
+		}
 		conn.Write([]byte("123454321"))
 		conn.Close()
 	}
