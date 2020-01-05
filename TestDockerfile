@@ -5,5 +5,5 @@ RUN go get github.com/mattn/goveralls
 ADD . /go/src/github.com/ooni/jafar
 WORKDIR /go/src/github.com/ooni/jafar
 CMD go test -v -coverprofile=jafar.cov -coverpkg=./... ./... &&                \
-    /go/bin/goveralls -coverprofile=jafar.cov -service=travis-ci
-CMD ./test/all.bash
+    /go/bin/goveralls -coverprofile=jafar.cov -service=travis-ci &&            \
+    ./test/all.bash
