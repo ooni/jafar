@@ -1,8 +1,10 @@
 FROM alpine:edge
-RUN apk add curl go git iptables musl-dev sudo
+RUN apk add bash bind-tools curl go git iptables musl-dev sudo
 ENV GOPATH=/go
 RUN go get github.com/mattn/goveralls
 ADD . /go/src/github.com/ooni/jafar
 WORKDIR /go/src/github.com/ooni/jafar
 CMD go test -v -coverprofile=jafar.cov -coverpkg=./... ./... &&                \
     /go/bin/goveralls -coverprofile=jafar.cov -service=travis-ci
+CMD go build -v .
+CMD ./test/all.bash
