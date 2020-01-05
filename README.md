@@ -209,12 +209,18 @@ contains one of the strings provided with this option.
 
 ```
   -bad-proxy-address string
-        Address where the bad proxy should listen (default "127.0.0.1:7117")
+        Address where the bad proxy should listen for TCP connections
+        (default "127.0.0.1:7117")
+  -bad-proxy-address-tls string
+        Address where the bad proxy should listen for TLS connections
+        (default "127.0.0.1:7117")
 ```
 
 The bad proxy is a proxy that reads some bytes from any incoming connection
 and then closes the connection without replying anything. This simulates a
 proxy that is not working properly, hence the name of the module.
+
+When connecting using TLS, the above behaviour happens after the handshake.
 
 ## Examples
 
