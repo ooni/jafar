@@ -137,7 +137,6 @@ func checkdial(
 	dial func(network, address string) (net.Conn, error),
 ) {
 	conn, err := dial("tcp", proxyAddr)
-	t.Log(err)
 	if err != expectErr {
 		t.Fatal("not the result we expected")
 	}

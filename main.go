@@ -2,9 +2,11 @@
 package main
 
 import (
+	"encoding/pem"
 	"errors"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -26,8 +28,9 @@ import (
 )
 
 var (
-	badProxyAddress    *string
-	badProxyAddressTLS *string
+	badProxyAddress     *string
+	badProxyAddressTLS  *string
+	badProxyTLSOutputCA *string
 
 	dnsProxyAddress      *string
 	dnsProxyBlock        flagx.StringArray
@@ -65,11 +68,15 @@ func init() {
 	// badProxy
 	badProxyAddress = flag.String(
 		"bad-proxy-address", "127.0.0.1:7117",
-		"Address where the bad proxy should listen for TCP connections",
+		"Address where to listen for TCP connections",
 	)
 	badProxyAddressTLS = flag.String(
 		"bad-proxy-address-tls", "127.0.0.1:4114",
-		"Address where the bad proxy should listen for TLS connections",
+		"Address where to listen for TLS connections",
+	)
+	badProxyTLSOutputCA = flag.String(
+		"bad-proxy-tls-output-ca", "badproxy.pem",
+		"File where to write the CA used by the bad proxy",
 	)
 
 	// dnsProxy
@@ -190,8 +197,13 @@ func badProxyStart() net.Listener {
 
 func badProxyStartTLS() net.Listener {
 	proxy := badproxy.NewCensoringProxy()
-	listener, _, err := proxy.StartTLS(*badProxyAddressTLS)
+	listener, cert, err := proxy.StartTLS(*badProxyAddressTLS)
 	rtx.Must(err, "proxy.Start failed")
+	err = ioutil.WriteFile(*badProxyTLSOutputCA, pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: cert.Raw,
+	}), 0644)
+	rtx.Must(err, "ioutil.WriteFile failed")
 	return listener
 }
 

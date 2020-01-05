@@ -1,5 +1,6 @@
 /.vscode
 /asn.mmdb
+/badproxy.pem
 /ca-bundle.pem
 /country.mmdb
 /coverage.cov

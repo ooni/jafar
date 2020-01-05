@@ -209,11 +209,11 @@ contains one of the strings provided with this option.
 
 ```
   -bad-proxy-address string
-        Address where the bad proxy should listen for TCP connections
-        (default "127.0.0.1:7117")
+        Address where to listen for TCP connections (default "127.0.0.1:7117")
   -bad-proxy-address-tls string
-        Address where the bad proxy should listen for TLS connections
-        (default "127.0.0.1:7117")
+        Address where to listen for TLS connections (default "127.0.0.1:4114")
+  -bad-proxy-tls-output-ca string
+        File where to write the CA used by the bad proxy (default "badproxy.pem")
 ```
 
 The bad proxy is a proxy that reads some bytes from any incoming connection
@@ -221,6 +221,11 @@ and then closes the connection without replying anything. This simulates a
 proxy that is not working properly, hence the name of the module.
 
 When connecting using TLS, the above behaviour happens after the handshake.
+
+We write the CA on the file specified using `-bad-proxy-tls-output-ca` such that
+tools like curl(1) can use such CA to avoid TLS handshake errors. The code will
+generate on the fly a certificate for the provided SNI. Not providing any SNI in
+the client Hello message will cause the TLS handshake to fail.
 
 ## Examples
 
