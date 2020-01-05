@@ -1,19 +1,22 @@
-// Package badproxy contains a bad proxy. Specifically this proxy
-// will read some bytes from the input and then close the connection.
-package badproxy
+// Package mitmproxy contains a TLS MITM proxy
+package mitmproxy
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"io"
 	"io/ioutil"
 	"net"
 	"strings"
 	"time"
+
+	"github.com/google/martian/v3/mitm"
 )
 
-// CensoringProxy is a bad proxy
+// CensoringProxy is a TLS MITM proxy
 type CensoringProxy struct{}
 
-// NewCensoringProxy creates a new bad proxy
+// NewCensoringProxy creates a new TLS MITM proxy
 func NewCensoringProxy() *CensoringProxy {
 	return new(CensoringProxy)
 }
@@ -42,12 +45,22 @@ func (p *CensoringProxy) run(listener net.Listener) {
 	}
 }
 
-// Start starts the bad proxy
-func (p *CensoringProxy) Start(address string) (net.Listener, error) {
-	listener, err := net.Listen("tcp", address)
+// Start starts the TLS MITM proxy
+func (p *CensoringProxy) Start(address string) (net.Listener, *x509.Certificate, error) {
+	cert, privkey, err := mitm.NewAuthority(
+		"jafar", "OONI", 24*time.Hour,
+	)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+	config, err := mitm.NewConfig(cert, privkey)
+	if err != nil {
+		return nil, nil, err
+	}
+	listener, err := tls.Listen("tcp", address, config.TLS())
+	if err != nil {
+		return nil, nil, err
 	}
 	go p.run(listener)
-	return listener, nil
+	return listener, cert, nil
 }

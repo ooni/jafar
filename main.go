@@ -20,6 +20,7 @@ import (
 	"github.com/ooni/jafar/badproxy"
 	"github.com/ooni/jafar/httpproxy"
 	"github.com/ooni/jafar/iptables"
+	"github.com/ooni/jafar/mitmproxy"
 	"github.com/ooni/jafar/resolver"
 	"github.com/ooni/jafar/shellx"
 	"github.com/ooni/jafar/tlsproxy"
@@ -53,6 +54,8 @@ var (
 	mainCh      chan os.Signal
 	mainCommand *string
 	mainUser    *string
+
+	mitmProxyAddress *string
 
 	tlsProxyAddress      *string
 	tlsProxyBlock        flagx.StringArray
@@ -157,6 +160,12 @@ func init() {
 	mainCommand = flag.String("main-command", "", "Optional command to execute")
 	mainUser = flag.String("main-user", "nobody", "Run command as user")
 
+	// mitmProxy
+	mitmProxyAddress = flag.String(
+		"mitm-proxy-address", "127.0.0.1:4114",
+		"Address where the MITM TLS proxy should listen",
+	)
+
 	// tlsProxy
 	tlsProxyAddress = flag.String(
 		"tls-proxy-address", "127.0.0.1:443",
@@ -222,6 +231,13 @@ func iptablesStart() *iptables.CensoringPolicy {
 	return policy
 }
 
+func mitmProxyStart() net.Listener {
+	proxy := mitmproxy.NewCensoringProxy()
+	listener, _, err := proxy.Start(*badProxyAddress)
+	rtx.Must(err, "proxy.Start failed")
+	return listener
+}
+
 func tlsProxyStart() net.Listener {
 	proxy, err := tlsproxy.NewCensoringProxy(
 		tlsProxyBlock, *tlsProxyDNSTransport, *tlsProxyDNSAddress,
@@ -256,6 +272,8 @@ func main() {
 	defer dnsproxy.Shutdown()
 	httpproxy := httpProxyStart()
 	defer httpproxy.Close()
+	mitmproxylistener := mitmProxyStart()
+	defer mitmproxylistener.Close()
 	tlslistener := tlsProxyStart()
 	defer tlslistener.Close()
 	policy := iptablesStart()
