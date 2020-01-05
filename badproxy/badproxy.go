@@ -43,9 +43,18 @@ func NewCensoringProxy() *CensoringProxy {
 func (p *CensoringProxy) serve(conn net.Conn) {
 	deadline := time.Now().Add(250 * time.Millisecond)
 	conn.SetDeadline(deadline)
-	const maxread = 1 << 17
-	reader := io.LimitReader(conn, maxread)
-	ioutil.ReadAll(reader)
+	// To simulate the case where the proxy isn't willing to forward our
+	// traffic, we close the connection (1) right after the handshake for
+	// TLS connections and (2) reasonably after we've received the HTTP
+	// request for cleartext connections. This may break in several cases
+	// but is good enough approximation of these bad proxies for now.
+	if tlsconn, ok := conn.(*tls.Conn); ok {
+		tlsconn.Handshake()
+	} else {
+		const maxread = 1 << 17
+		reader := io.LimitReader(conn, maxread)
+		ioutil.ReadAll(reader)
+	}
 	conn.Close()
 }
 

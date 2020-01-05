@@ -29,6 +29,10 @@ func TestIntegrationTLS(t *testing.T) {
 			if err != nil {
 				return nil, err
 			}
+			if err = conn.Handshake(); err != nil {
+				conn.Close()
+				return nil, err
+			}
 			return conn, nil
 		})
 	killproxy(t, listener)
