@@ -44,7 +44,7 @@ def execute_jafar(ooni_exe, outfile, args):
         os.remove(outfile)  # just in case
     execute([
         "./jafar",
-        "-main-command", "%s -gno '%s' telegram" % (ooni_exe, outfile),
+        "-main-command", "%s -no '%s' telegram" % (ooni_exe, outfile),
         "-main-user", os.environ["SUDO_USER"],
     ] + args)
 
@@ -100,9 +100,10 @@ def execute_jafar_and_return_validated_test_keys(ooni_exe, outfile, args):
         resp = entry["response"]
         check_maybe_binary_value(resp["body"])
         assert isinstance(resp["code"], int)
-        for key, value in resp["headers"].items():
-            assert isinstance(key, str)
-            check_maybe_binary_value(value)
+        if resp["headers"] is not None:
+            for key, value in resp["headers"].items():
+                assert isinstance(key, str)
+                check_maybe_binary_value(value)
     assert isinstance(tk["tcp_connect"], list)
     assert len(tk["tcp_connect"]) > 0
     for entry in tk["tcp_connect"]:
