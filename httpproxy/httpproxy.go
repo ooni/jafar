@@ -8,9 +8,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/apex/log"
-	"github.com/ooni/netx/httpx"
-	"github.com/ooni/netx/x/logger"
+	"github.com/ooni/probe-engine/netx/httptransport"
 )
 
 const product = "jafar/0.1.0"
@@ -27,14 +25,9 @@ type CensoringProxy struct {
 // the Host header of a request. dnsNetwork and dnsAddress are
 // settings to configure the upstream, non censored DNS.
 func NewCensoringProxy(
-	keywords []string, dnsNetwork, dnsAddress string,
-) (*CensoringProxy, error) {
-	client := httpx.NewClient(logger.NewHandler(log.Log))
-	proxy := &CensoringProxy{
-		keywords:  keywords,
-		transport: client.Transport,
-	}
-	return proxy, client.ConfigureDNS(dnsNetwork, dnsAddress)
+	keywords []string, uncensored httptransport.RoundTripper,
+) *CensoringProxy {
+	return &CensoringProxy{keywords: keywords, transport: uncensored}
 }
 
 var blockpage = []byte(`<html><head>

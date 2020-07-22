@@ -15,6 +15,7 @@ import (
 
 	"github.com/ooni/jafar/resolver"
 	"github.com/ooni/jafar/shellx"
+	"github.com/ooni/jafar/uncensored"
 )
 
 func TestUnitCannotApplyPolicy(t *testing.T) {
@@ -89,7 +90,7 @@ func TestIntegrationDropKeyword(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected an error here")
 	}
-	if err.Error() != "Get http://www.ooni.io: context deadline exceeded" {
+	if !strings.HasSuffix(err.Error(), "context deadline exceeded") {
 		t.Fatal("unexpected error occurred")
 	}
 	if resp != nil {
@@ -194,12 +195,10 @@ func TestIntegrationHijackDNS(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("not implemented on this platform")
 	}
-	resolver, err := resolver.NewCensoringResolver(
-		[]string{"ooni.io"}, nil, nil, "dot", "1.1.1.1:853",
+	resolver := resolver.NewCensoringResolver(
+		[]string{"ooni.io"}, nil, nil,
+		uncensored.Must(uncensored.NewClient("dot://1.1.1.1:853")),
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
 	server, err := resolver.Start("127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)

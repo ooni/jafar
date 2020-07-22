@@ -6,6 +6,8 @@ import (
 	"net"
 	"sync"
 	"testing"
+
+	"github.com/ooni/jafar/uncensored"
 )
 
 func TestIntegrationPass(t *testing.T) {
@@ -91,12 +93,9 @@ func TestFailWriteAfterConnect(t *testing.T) {
 }
 
 func TestIntegrationListenError(t *testing.T) {
-	proxy, err := NewCensoringProxy(
-		[]string{""}, "dot", "1.1.1.1:853",
+	proxy := NewCensoringProxy(
+		[]string{""}, uncensored.DefaultClient,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
 	listener, err := proxy.Start("8.8.8.8:80")
 	if err == nil {
 		t.Fatal("expected an error here")
@@ -107,12 +106,9 @@ func TestIntegrationListenError(t *testing.T) {
 }
 
 func newproxy(t *testing.T, blocked string) net.Listener {
-	proxy, err := NewCensoringProxy(
-		[]string{blocked}, "system", "",
+	proxy := NewCensoringProxy(
+		[]string{blocked}, uncensored.DefaultClient,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
 	listener, err := proxy.Start("127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)

@@ -2,6 +2,7 @@
 package tlsproxy
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"net"
@@ -9,8 +10,7 @@ import (
 	"sync"
 
 	"github.com/apex/log"
-	"github.com/ooni/netx"
-	"github.com/ooni/netx/x/logger"
+	"github.com/ooni/probe-engine/netx/httptransport"
 )
 
 // CensoringProxy is a censoring TLS proxy
@@ -25,14 +25,14 @@ type CensoringProxy struct {
 // the SNII record of a ClientHello. dnsNetwork and dnsAddress are
 // settings to configure the upstream, non censored DNS.
 func NewCensoringProxy(
-	keywords []string, dnsNetwork, dnsAddress string,
-) (*CensoringProxy, error) {
-	dialer := netx.NewDialer(logger.NewHandler(log.Log))
-	proxy := &CensoringProxy{
+	keywords []string, uncensored httptransport.Dialer,
+) *CensoringProxy {
+	return &CensoringProxy{
 		keywords: keywords,
-		dial:     dialer.Dial,
+		dial: func(network, address string) (net.Conn, error) {
+			return uncensored.DialContext(context.Background(), network, address)
+		},
 	}
-	return proxy, dialer.ConfigureDNS(dnsNetwork, dnsAddress)
 }
 
 // handshakeReader is a hack to perform the initial part of the

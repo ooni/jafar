@@ -5,19 +5,8 @@ import (
 	"testing"
 
 	"github.com/miekg/dns"
+	"github.com/ooni/jafar/uncensored"
 )
-
-func TestNewCensoringResolverFailure(t *testing.T) {
-	resolver, err := NewCensoringResolver(
-		nil, nil, nil, "antani", "1.1.1.1:853",
-	)
-	if err == nil {
-		t.Fatal("expected an error here")
-	}
-	if resolver != nil {
-		t.Fatal("expected nil resolver here")
-	}
-}
 
 func TestIntegrationPass(t *testing.T) {
 	server := newresolver(t, []string{"ooni.io"}, []string{"ooni.nu"}, nil)
@@ -52,22 +41,16 @@ func TestIntegrationLookupFailure(t *testing.T) {
 }
 
 func TestFailureNoQuestion(t *testing.T) {
-	resolver, err := NewCensoringResolver(
-		nil, nil, nil, "dot", "1.1.1.1:853",
+	resolver := NewCensoringResolver(
+		nil, nil, nil, uncensored.DefaultClient,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
 	resolver.ServeDNS(&fakeResponseWriter{t: t}, new(dns.Msg))
 }
 
 func TestListenFailure(t *testing.T) {
-	resolver, err := NewCensoringResolver(
-		nil, nil, nil, "dot", "1.1.1.1:853",
+	resolver := NewCensoringResolver(
+		nil, nil, nil, uncensored.DefaultClient,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
 	server, err := resolver.Start("8.8.8.8:53")
 	if err == nil {
 		t.Fatal("expected an error here")
@@ -78,15 +61,12 @@ func TestListenFailure(t *testing.T) {
 }
 
 func newresolver(t *testing.T, blocked, hijacked, ignored []string) *dns.Server {
-	resolver, err := NewCensoringResolver(
+	resolver := NewCensoringResolver(
 		blocked, hijacked, ignored,
 		// using faster dns because dot here causes miekg/dns's
 		// dns.Exchange to timeout and I don't want more complexity
-		"system", "",
+		uncensored.Must(uncensored.NewClient("system:///")),
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
 	server, err := resolver.Start("127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
