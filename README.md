@@ -6,11 +6,11 @@
 [![Build Status](https://travis-ci.org/ooni/jafar.svg?branch=master)](https://travis-ci.org/ooni/jafar) [![Coverage Status](https://coveralls.io/repos/github/ooni/jafar/badge.svg?branch=master)](https://coveralls.io/github/ooni/jafar?branch=master) [![Go Report Card](https://goreportcard.com/badge/github.com/ooni/jafar)](https://goreportcard.com/report/github.com/ooni/jafar)
 
 Jafar is a censorship simulation tool. Some of its functionality are more
-easily coupled with github.com/ooni/netx.
+easily coupled with github.com/ooni/probe-engine/netx.
 
 ## Building
 
-We use Go >= 1.13. Jafar also needs the C library headers,
+We use Go >= 1.14. Jafar also needs the C library headers,
 iptables installed, and root permissions.
 
 With Linux Alpine edge, you can compile Jafar with:
@@ -118,17 +118,14 @@ dropping specific DNS packets, combine DNS traffic hijacking with
 https://godoc.org/github.com/ooni/jafar/resolver)
 
 The DNS proxy or resolver allows to manipulate DNS. Unless you use DNS
-hijacking, you will need to configure your application explicitly.
+hijacking, you will need to configure your application explicitly to use
+the proxy with application specific command line flags.
 
 ```
   -dns-proxy-address string
         Address where the DNS proxy should listen (default "127.0.0.1:53")
   -dns-proxy-block value
         Register keyword triggering NXDOMAIN censorship
-  -dns-proxy-dns-address string
-        Address of the upstream DNS to be used by the proxy (default "1.1.1.1:853")
-  -dns-proxy-dns-transport string
-        Transport to be used with the upstream DNS (default "dot")
   -dns-proxy-hijack value
         Register keyword triggering redirection to 127.0.0.1
   -dns-proxy-ignore value
@@ -136,12 +133,7 @@ hijacking, you will need to configure your application explicitly.
 ```
 
 The `-dns-proxy-address` flag controls the endpoint where the proxy is
-listening. The `-dns-proxy-dns-{address,transport}` flags allow to choose
-a different upstream DNS with transports like `dot` and `doh`. Remember
-to avoid using the `udp` transport if you're also using DNS hijacking since
-these two settings will probably clash. See github.com/ooni/netx and in
-particular the documentation of ConfigureDNS for more information concerning
-the different transports that you can use.
+listening.
 
 The `-dns-proxy-block` tells the resolver that every incoming request whose
 query contains the specifed string shall receive an `NXDOMAIN` reply.
@@ -165,15 +157,10 @@ specific requests. It's controlled by these flags:
         Address where the HTTP proxy should listen (default "127.0.0.1:80")
   -http-proxy-block value
         Register keyword triggering HTTP 451 censorship
-  -http-proxy-dns-address string
-        Address of the upstream DNS to be used by the proxy (default "1.1.1.1:853")
-  -http-proxy-dns-transport string
-        Transport to be used with the upstream DNS (default "dot")
 ```
 
-The `-http-proxy-address` and `-http-proxy-dns-{address,transport}` flags
-have the same semantics they have for the DNS proxy, and they also have the
-same caveats regarding mixing DNS hijacking and `udp` transports.
+The `-http-proxy-address` flag has the same semantics it has for the DNS
+proxy.
 
 The `-http-proxy-block` flag tells the proxy that it should return a `451`
 response for every request whose `Host` contains the specified string.
@@ -191,15 +178,10 @@ on their SNI value. It is controlled by the following flags:
         Address where the HTTP proxy should listen (default "127.0.0.1:443")
   -tls-proxy-block value
         Register keyword triggering TLS censorship
-  -tls-proxy-dns-address string
-        Address of the upstream DNS to be used by the proxy (default "1.1.1.1:853")
-  -tls-proxy-dns-transport string
-        Transport to be used with the upstream DNS (default "dot")
 ```
 
-The `-tls-proxy-address` and `-tls-proxy-dns-{address,transport}` flags
-have the same semantics they have for the DNS proxy, and they also have the
-same caveats regarding mixing DNS hijacking and `udp` transports.
+The `-tls-proxy-address` flags has the same semantics it has for the DNS
+proxy.
 
 The `-tls-proxy-block` specifies which string or strings should cause the
 proxy to return an internal-erorr alert when the incoming ClientHello's SNI
@@ -226,6 +208,28 @@ We write the CA on the file specified using `-bad-proxy-tls-output-ca` such that
 tools like curl(1) can use such CA to avoid TLS handshake errors. The code will
 generate on the fly a certificate for the provided SNI. Not providing any SNI in
 the client Hello message will cause the TLS handshake to fail.
+
+### uncensored
+
+```
+  -uncensored-resolver-url string
+    	URL of an hopefully uncensored resolver (default "dot://1.1.1.1:853")
+```
+
+The HTTP, DNS, and TLS proxies need to resolve domain names. If you setup DNS
+censorship, they may be affected as well. To avoid this issue, we use a different
+resolver for them, which by default is `dot://1.1.1.1:853`. You can change such
+default by using the `-uncensored-resolver-url` command line flag. The input
+URL is `<transport>://<domain>[:<port>][/<path>]`. Here are some examples:
+
+* `system:///` uses the system resolver (i.e. `getaddrinfo`)
+* `udp://8.8.8.8:53` uses DNS over UDP
+* `tcp://8.8.8.8:53` used DNS over TCP
+* `dot://8.8.8.8:853` uses DNS over TLS
+* `https://doh.powerdns.com/` uses DNS over HTTPS
+
+So, for example, if you are using Jafar to censor `1.1.1.1:853`, then you
+most likely want to use `-uncensored-resolver-url`.
 
 ## Examples
 

@@ -25,6 +25,7 @@ import (
 	"github.com/ooni/jafar/resolver"
 	"github.com/ooni/jafar/shellx"
 	"github.com/ooni/jafar/tlsproxy"
+	"github.com/ooni/jafar/uncensored"
 )
 
 var (
@@ -32,17 +33,13 @@ var (
 	badProxyAddressTLS  *string
 	badProxyTLSOutputCA *string
 
-	dnsProxyAddress      *string
-	dnsProxyBlock        flagx.StringArray
-	dnsProxyDNSAddress   *string
-	dnsProxyDNSTransport *string
-	dnsProxyHijack       flagx.StringArray
-	dnsProxyIgnore       flagx.StringArray
+	dnsProxyAddress *string
+	dnsProxyBlock   flagx.StringArray
+	dnsProxyHijack  flagx.StringArray
+	dnsProxyIgnore  flagx.StringArray
 
-	httpProxyAddress      *string
-	httpProxyBlock        flagx.StringArray
-	httpProxyDNSAddress   *string
-	httpProxyDNSTransport *string
+	httpProxyAddress *string
+	httpProxyBlock   flagx.StringArray
 
 	iptablesDropIP          flagx.StringArray
 	iptablesDropKeywordHex  flagx.StringArray
@@ -58,10 +55,10 @@ var (
 	mainCommand *string
 	mainUser    *string
 
-	tlsProxyAddress      *string
-	tlsProxyBlock        flagx.StringArray
-	tlsProxyDNSAddress   *string
-	tlsProxyDNSTransport *string
+	tlsProxyAddress *string
+	tlsProxyBlock   flagx.StringArray
+
+	uncensoredResolverURL *string
 )
 
 func init() {
@@ -88,14 +85,6 @@ func init() {
 		&dnsProxyBlock, "dns-proxy-block",
 		"Register keyword triggering NXDOMAIN censorship",
 	)
-	dnsProxyDNSAddress = flag.String(
-		"dns-proxy-dns-address", "1.1.1.1:853",
-		"Address of the upstream DNS to be used by the proxy",
-	)
-	dnsProxyDNSTransport = flag.String(
-		"dns-proxy-dns-transport", "dot",
-		"Transport to be used with the upstream DNS",
-	)
 	flag.Var(
 		&dnsProxyHijack, "dns-proxy-hijack",
 		"Register keyword triggering redirection to 127.0.0.1",
@@ -113,14 +102,6 @@ func init() {
 	flag.Var(
 		&httpProxyBlock, "http-proxy-block",
 		"Register keyword triggering HTTP 451 censorship",
-	)
-	httpProxyDNSAddress = flag.String(
-		"http-proxy-dns-address", "1.1.1.1:853",
-		"Address of the upstream DNS to be used by the proxy",
-	)
-	httpProxyDNSTransport = flag.String(
-		"http-proxy-dns-transport", "dot",
-		"Transport to be used with the upstream DNS",
 	)
 
 	// iptables
@@ -178,13 +159,10 @@ func init() {
 		&tlsProxyBlock, "tls-proxy-block",
 		"Register keyword triggering TLS censorship",
 	)
-	tlsProxyDNSAddress = flag.String(
-		"tls-proxy-dns-address", "1.1.1.1:853",
-		"Address of the upstream DNS to be used by the proxy",
-	)
-	tlsProxyDNSTransport = flag.String(
-		"tls-proxy-dns-transport", "dot",
-		"Transport to be used with the upstream DNS",
+
+	uncensoredResolverURL = flag.String(
+		"uncensored-resolver-url", "dot://1.1.1.1:853",
+		"URL of an hopefully uncensored resolver",
 	)
 }
 
@@ -207,22 +185,17 @@ func badProxyStartTLS() net.Listener {
 	return listener
 }
 
-func dnsProxyStart() *dns.Server {
-	proxy, err := resolver.NewCensoringResolver(
-		dnsProxyBlock, dnsProxyHijack, dnsProxyIgnore,
-		*dnsProxyDNSTransport, *dnsProxyDNSAddress,
+func dnsProxyStart(uncensored *uncensored.Client) *dns.Server {
+	proxy := resolver.NewCensoringResolver(
+		dnsProxyBlock, dnsProxyHijack, dnsProxyIgnore, uncensored,
 	)
-	rtx.Must(err, "dns.NewCensoringResolver failed")
 	server, err := proxy.Start(*dnsProxyAddress)
 	rtx.Must(err, "proxy.Start failed")
 	return server
 }
 
-func httpProxyStart() *http.Server {
-	proxy, err := httpproxy.NewCensoringProxy(
-		httpProxyBlock, *httpProxyDNSTransport, *httpProxyDNSAddress,
-	)
-	rtx.Must(err, "http.NewCensoringProxy failed")
+func httpProxyStart(uncensored *uncensored.Client) *http.Server {
+	proxy := httpproxy.NewCensoringProxy(httpProxyBlock, uncensored)
 	server, _, err := proxy.Start(*httpProxyAddress)
 	rtx.Must(err, "proxy.Start failed")
 	return server
@@ -246,14 +219,17 @@ func iptablesStart() *iptables.CensoringPolicy {
 	return policy
 }
 
-func tlsProxyStart() net.Listener {
-	proxy, err := tlsproxy.NewCensoringProxy(
-		tlsProxyBlock, *tlsProxyDNSTransport, *tlsProxyDNSAddress,
-	)
-	rtx.Must(err, "tls.NewCensoringProxy failed")
+func tlsProxyStart(uncensored *uncensored.Client) net.Listener {
+	proxy := tlsproxy.NewCensoringProxy(tlsProxyBlock, uncensored)
 	listener, err := proxy.Start(*tlsProxyAddress)
 	rtx.Must(err, "proxy.Start failed")
 	return listener
+}
+
+func newUncensoredClient() *uncensored.Client {
+	clnt, err := uncensored.NewClient(*uncensoredResolverURL)
+	rtx.Must(err, "uncensored.NewClient failed")
+	return clnt
 }
 
 func mustx(err error, message string, osExit func(int)) {
@@ -274,15 +250,17 @@ func main() {
 	flag.Parse()
 	log.SetLevel(log.DebugLevel)
 	log.SetHandler(cli.Default)
+	uncensoredClient := newUncensoredClient()
+	defer uncensoredClient.CloseIdleConnections()
 	badlistener := badProxyStart()
 	defer badlistener.Close()
 	badtlslistener := badProxyStartTLS()
 	defer badtlslistener.Close()
-	dnsproxy := dnsProxyStart()
+	dnsproxy := dnsProxyStart(uncensoredClient)
 	defer dnsproxy.Shutdown()
-	httpproxy := httpProxyStart()
+	httpproxy := httpProxyStart(uncensoredClient)
 	defer httpproxy.Close()
-	tlslistener := tlsProxyStart()
+	tlslistener := tlsProxyStart(uncensoredClient)
 	defer tlslistener.Close()
 	policy := iptablesStart()
 	var err error

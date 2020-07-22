@@ -6,10 +6,8 @@ import (
 	"net"
 	"strings"
 
-	"github.com/apex/log"
 	"github.com/miekg/dns"
-	"github.com/ooni/netx"
-	"github.com/ooni/netx/x/logger"
+	"github.com/ooni/probe-engine/netx/httptransport"
 )
 
 // CensoringResolver is a censoring resolver.
@@ -27,19 +25,14 @@ type CensoringResolver struct {
 // and TLS proxies will pick them up. dnsNetwork and dnsAddress are the
 // settings to configure the upstream, non censored DNS.
 func NewCensoringResolver(
-	blocked, hijacked, ignored []string, dnsNetwork, dnsAddress string,
-) (*CensoringResolver, error) {
-	dialer := netx.NewDialer(logger.NewHandler(log.Log))
-	resolver, err := dialer.NewResolver(dnsNetwork, dnsAddress)
-	if err != nil {
-		return nil, err
-	}
+	blocked, hijacked, ignored []string, uncensored httptransport.Resolver,
+) *CensoringResolver {
 	return &CensoringResolver{
 		blocked:    blocked,
 		hijacked:   hijacked,
 		ignored:    ignored,
-		lookupHost: resolver.LookupHost,
-	}, nil
+		lookupHost: uncensored.LookupHost,
+	}
 }
 
 func (r *CensoringResolver) roundtrip(rw dns.ResponseWriter, req *dns.Msg) {
