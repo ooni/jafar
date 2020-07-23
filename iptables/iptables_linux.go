@@ -3,7 +3,7 @@
 package iptables
 
 import (
-	"github.com/m-lab/go/rtx"
+	"github.com/ooni/jafar/internal/runtimex"
 	"github.com/ooni/jafar/shellx"
 )
 
@@ -16,17 +16,17 @@ func (s *linuxShell) createChains() (err error) {
 		}
 	}()
 	err = shellx.Run("iptables", "-N", "JAFAR_INPUT")
-	rtx.PanicOnError(err, "cannot create JAFAR_INPUT chain")
+	runtimex.PanicOnError(err, "cannot create JAFAR_INPUT chain")
 	err = shellx.Run("iptables", "-N", "JAFAR_OUTPUT")
-	rtx.PanicOnError(err, "cannot create JAFAR_OUTPUT chain")
+	runtimex.PanicOnError(err, "cannot create JAFAR_OUTPUT chain")
 	err = shellx.Run("iptables", "-t", "nat", "-N", "JAFAR_NAT_OUTPUT")
-	rtx.PanicOnError(err, "cannot create JAFAR_NAT_OUTPUT chain")
+	runtimex.PanicOnError(err, "cannot create JAFAR_NAT_OUTPUT chain")
 	err = shellx.Run("iptables", "-I", "OUTPUT", "-j", "JAFAR_OUTPUT")
-	rtx.PanicOnError(err, "cannot insert jump to JAFAR_OUTPUT")
+	runtimex.PanicOnError(err, "cannot insert jump to JAFAR_OUTPUT")
 	err = shellx.Run("iptables", "-I", "INPUT", "-j", "JAFAR_INPUT")
-	rtx.PanicOnError(err, "cannot insert jump to JAFAR_INPUT")
+	runtimex.PanicOnError(err, "cannot insert jump to JAFAR_INPUT")
 	err = shellx.Run("iptables", "-t", "nat", "-I", "OUTPUT", "-j", "JAFAR_NAT_OUTPUT")
-	rtx.PanicOnError(err, "cannot insert jump to JAFAR_NAT_OUTPUT")
+	runtimex.PanicOnError(err, "cannot insert jump to JAFAR_NAT_OUTPUT")
 	return nil
 }
 

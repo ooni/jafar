@@ -3,7 +3,7 @@
 package iptables
 
 import (
-	"github.com/m-lab/go/rtx"
+	"github.com/ooni/jafar/internal/runtimex"
 )
 
 type shell interface {
@@ -49,44 +49,44 @@ func (c *CensoringPolicy) Apply() (err error) {
 		}
 	}()
 	err = c.sh.createChains()
-	rtx.PanicOnError(err, "c.sh.createChains failed")
+	runtimex.PanicOnError(err, "c.sh.createChains failed")
 	// Implementation note: we want the RST rules to be first such
 	// that we end up enforcing them before the drop rules.
 	for _, keyword := range c.ResetKeywordsHex {
 		err = c.sh.rstIfContainsKeywordHexAndIsTCP(keyword)
-		rtx.PanicOnError(err, "c.sh.rstIfContainsKeywordHexAndIsTCP failed")
+		runtimex.PanicOnError(err, "c.sh.rstIfContainsKeywordHexAndIsTCP failed")
 	}
 	for _, keyword := range c.ResetKeywords {
 		err = c.sh.rstIfContainsKeywordAndIsTCP(keyword)
-		rtx.PanicOnError(err, "c.sh.rstIfContainsKeywordAndIsTCP failed")
+		runtimex.PanicOnError(err, "c.sh.rstIfContainsKeywordAndIsTCP failed")
 	}
 	for _, ip := range c.ResetIPs {
 		err = c.sh.rstIfDestinationEqualsAndIsTCP(ip)
-		rtx.PanicOnError(err, "c.sh.rstIfDestinationEqualsAndIsTCP failed")
+		runtimex.PanicOnError(err, "c.sh.rstIfDestinationEqualsAndIsTCP failed")
 	}
 	for _, keyword := range c.DropKeywordsHex {
 		err = c.sh.dropIfContainsKeywordHex(keyword)
-		rtx.PanicOnError(err, "c.sh.dropIfContainsKeywordHex failed")
+		runtimex.PanicOnError(err, "c.sh.dropIfContainsKeywordHex failed")
 	}
 	for _, keyword := range c.DropKeywords {
 		err = c.sh.dropIfContainsKeyword(keyword)
-		rtx.PanicOnError(err, "c.sh.dropIfContainsKeyword failed")
+		runtimex.PanicOnError(err, "c.sh.dropIfContainsKeyword failed")
 	}
 	for _, ip := range c.DropIPs {
 		err = c.sh.dropIfDestinationEquals(ip)
-		rtx.PanicOnError(err, "c.sh.dropIfDestinationEquals failed")
+		runtimex.PanicOnError(err, "c.sh.dropIfDestinationEquals failed")
 	}
 	if c.HijackDNSAddress != "" {
 		err = c.sh.hijackDNS(c.HijackDNSAddress)
-		rtx.PanicOnError(err, "c.sh.hijackDNS failed")
+		runtimex.PanicOnError(err, "c.sh.hijackDNS failed")
 	}
 	if c.HijackHTTPSAddress != "" {
 		err = c.sh.hijackHTTPS(c.HijackHTTPSAddress)
-		rtx.PanicOnError(err, "c.sh.hijackHTTPS failed")
+		runtimex.PanicOnError(err, "c.sh.hijackHTTPS failed")
 	}
 	if c.HijackHTTPAddress != "" {
 		err = c.sh.hijackHTTP(c.HijackHTTPAddress)
-		rtx.PanicOnError(err, "c.sh.hijackHTTP failed")
+		runtimex.PanicOnError(err, "c.sh.hijackHTTP failed")
 	}
 	return
 }
