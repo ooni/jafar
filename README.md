@@ -8,6 +8,9 @@
 Jafar is a censorship simulation tool. Some of its functionality are more
 easily coupled with github.com/ooni/probe-engine/netx.
 
+**Warning**: Jafar has now been merged into github.com/ooni/probe-engine so
+you should use the version of Jafar available there.
+
 ## Building
 
 We use Go >= 1.14. Jafar also needs the C library headers,
