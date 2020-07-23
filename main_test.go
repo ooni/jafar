@@ -3,12 +3,16 @@ package main
 import (
 	"errors"
 	"os"
+	"runtime"
 	"testing"
 
 	"github.com/ooni/jafar/shellx"
 )
 
 func TestIntegrationNoCommand(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("skipping test on non Linux systems")
+	}
 	*dnsProxyAddress = "127.0.0.1:0"
 	*httpProxyAddress = "127.0.0.1:0"
 	*tlsProxyAddress = "127.0.0.1:0"
@@ -19,6 +23,9 @@ func TestIntegrationNoCommand(t *testing.T) {
 }
 
 func TestIntegrationWithCommand(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("skipping test on non Linux systems")
+	}
 	*dnsProxyAddress = "127.0.0.1:0"
 	*httpProxyAddress = "127.0.0.1:0"
 	*tlsProxyAddress = "127.0.0.1:0"
