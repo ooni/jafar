@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	"github.com/apex/log"
-	"github.com/m-lab/go/rtx"
+	"github.com/ooni/jafar/internal/runtimex"
 	"github.com/ooni/probe-engine/experiment/urlgetter"
 	"github.com/ooni/probe-engine/netx/httptransport"
 )
@@ -41,7 +41,7 @@ func NewClient(resolverURL string) (*Client, error) {
 // Must panics if it's not possible to create a Client. Usually you should
 // use it like `uncensored.Must(uncensored.NewClient(URL))`.
 func Must(client *Client, err error) *Client {
-	rtx.Must(err, "cannot create uncensored client")
+	runtimex.PanicOnError(err, "cannot create uncensored client")
 	return client
 }
 

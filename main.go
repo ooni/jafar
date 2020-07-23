@@ -16,11 +16,11 @@ import (
 
 	"github.com/apex/log"
 	"github.com/apex/log/handlers/cli"
-	"github.com/m-lab/go/flagx"
-	"github.com/m-lab/go/rtx"
 	"github.com/miekg/dns"
 	"github.com/ooni/jafar/badproxy"
+	"github.com/ooni/jafar/flagx"
 	"github.com/ooni/jafar/httpproxy"
+	"github.com/ooni/jafar/internal/runtimex"
 	"github.com/ooni/jafar/iptables"
 	"github.com/ooni/jafar/resolver"
 	"github.com/ooni/jafar/shellx"
@@ -169,19 +169,19 @@ func init() {
 func badProxyStart() net.Listener {
 	proxy := badproxy.NewCensoringProxy()
 	listener, err := proxy.Start(*badProxyAddress)
-	rtx.Must(err, "proxy.Start failed")
+	runtimex.PanicOnError(err, "proxy.Start failed")
 	return listener
 }
 
 func badProxyStartTLS() net.Listener {
 	proxy := badproxy.NewCensoringProxy()
 	listener, cert, err := proxy.StartTLS(*badProxyAddressTLS)
-	rtx.Must(err, "proxy.StartTLS failed")
+	runtimex.PanicOnError(err, "proxy.StartTLS failed")
 	err = ioutil.WriteFile(*badProxyTLSOutputCA, pem.EncodeToMemory(&pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: cert.Raw,
 	}), 0644)
-	rtx.Must(err, "ioutil.WriteFile failed")
+	runtimex.PanicOnError(err, "ioutil.WriteFile failed")
 	return listener
 }
 
@@ -190,14 +190,14 @@ func dnsProxyStart(uncensored *uncensored.Client) *dns.Server {
 		dnsProxyBlock, dnsProxyHijack, dnsProxyIgnore, uncensored,
 	)
 	server, err := proxy.Start(*dnsProxyAddress)
-	rtx.Must(err, "proxy.Start failed")
+	runtimex.PanicOnError(err, "proxy.Start failed")
 	return server
 }
 
 func httpProxyStart(uncensored *uncensored.Client) *http.Server {
 	proxy := httpproxy.NewCensoringProxy(httpProxyBlock, uncensored)
 	server, _, err := proxy.Start(*httpProxyAddress)
-	rtx.Must(err, "proxy.Start failed")
+	runtimex.PanicOnError(err, "proxy.Start failed")
 	return server
 }
 
@@ -215,20 +215,20 @@ func iptablesStart() *iptables.CensoringPolicy {
 	policy.ResetKeywordsHex = iptablesResetKeywordHex
 	policy.ResetKeywords = iptablesResetKeyword
 	err := policy.Apply()
-	rtx.Must(err, "policy.Apply failed")
+	runtimex.PanicOnError(err, "policy.Apply failed")
 	return policy
 }
 
 func tlsProxyStart(uncensored *uncensored.Client) net.Listener {
 	proxy := tlsproxy.NewCensoringProxy(tlsProxyBlock, uncensored)
 	listener, err := proxy.Start(*tlsProxyAddress)
-	rtx.Must(err, "proxy.Start failed")
+	runtimex.PanicOnError(err, "proxy.Start failed")
 	return listener
 }
 
 func newUncensoredClient() *uncensored.Client {
 	clnt, err := uncensored.NewClient(*uncensoredResolverURL)
-	rtx.Must(err, "uncensored.NewClient failed")
+	runtimex.PanicOnError(err, "uncensored.NewClient failed")
 	return clnt
 }
 
